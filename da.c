@@ -1,8 +1,12 @@
 #include<string.h>
+#include<pthread.h>
+#include<stdio.h>
+
+int suspend(int id);
 
 int main(int argc ,char** argv){
 
-    
+
 
 
 

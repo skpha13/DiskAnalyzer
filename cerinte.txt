@@ -20,8 +20,8 @@ Analyze the space occupied by the directory at [DIR]
 -S, --suspend <id> suspend task with <id>
 -R, --resume <id> resume task with <id>
 -r, --remove <id> remove the analysis with the given <id>
--i, --info <id> print status about the analysis with <id> (pending, progress, d
--l, --list list all analysis tasks, with their ID and the corresponding root p
+-i, --info <id> print status about the analysis with <id> (pending, progress, done)
+-l, --list list all analysis tasks, with their ID and the corresponding root parent
 -p, --print <id> print analysis report for those tasks that are "done"
 Exemplu de folosire:
 $> da -a /home/user/my_repo -p 3
