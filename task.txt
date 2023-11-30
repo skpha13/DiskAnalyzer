@@ -1,6 +1,6 @@
 - [ ] daemon functional (Mihai ?)
-- [ ] IPC daemon da 
-- [ ] da user input (Tavi)
+- [ ] IPC daemon da (Liviu)
+- [ ] da user input (Tavi,Liviu)
 - [ ] parcurgerea recursiva a folderului (Adi)
 
 

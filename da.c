@@ -3,6 +3,8 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include "headers/task_symbols.h"
+#include "headers/IPC.h"
+
 int is_digit(const char c){
     switch(c){
         case '1':
@@ -46,7 +48,9 @@ void suspend_task(int id);
 
 void resume_task(int id);
 
-void add_task(const char* path,int priority);
+void add_task(const char* path,int priority){
+    
+}
 
 void help();
 
