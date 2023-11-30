@@ -1,7 +1,6 @@
 #include<string.h>
 #include<pthread.h>
 #include<stdio.h>
-
 int is_digit(const char c){
     switch(c){
         case '1':
@@ -22,7 +21,7 @@ int is_digit(const char c){
 int is_natural(const char* c){
     if(!*c) return 0;//handle empty string
 
-    while (!c)
+    while (*c)
     {
         if(!is_digit(*c)) return 0;
         c++;
