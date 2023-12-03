@@ -48,7 +48,6 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-
     if (ret != NULL) 
         free(ret);
 
