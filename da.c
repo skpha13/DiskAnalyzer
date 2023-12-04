@@ -4,7 +4,13 @@
 #include<stdlib.h>
 #include "headers/task_symbols.h"
 #include "headers/IPC.h"
-
+#include<pthread.h>
+#include<errno.h>
+#include<semaphore.h>
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
+#include<unistd.h>
 int is_digit(const char c){
     switch(c){
     	case '0':
@@ -36,7 +42,7 @@ int is_natural(const char* c){
 }
 
 int is_priority(const char* c){
-    if(is_digit(*c)){
+    if(is_natural(c)){
         int priority=atoi(c);
         return (priority==LOW_PRIORITY||priority==NORMAL_PRIORITY||priority==HIGH_PRIORITY);
     }
@@ -44,9 +50,8 @@ int is_priority(const char* c){
 }
 
 int check_args(const char *arg, const char *option1, const char *option2){
-	if(!strcmp(arg,option1) || !strcmp(arg,option2))
-		return 1;
-	return 0;
+	return !strcmp(arg,option1) || !strcmp(arg,option2);
+	
 }
 
 
@@ -74,29 +79,58 @@ void help(){
 	);
 }
 
-void add_task(const char* path,int priority){}
+void add_task(const char* path,int priority,daemon_file_t*){}
 
-void suspend_task(int id){}
+void suspend_task(int id,daemon_file_t*){}
 
-void resume_task(int id){}
+void resume_task(int id,daemon_file_t*){}
 
-void remove_task(int id){}
+void remove_task(int id,daemon_file_t*){}
 
-void info_task(int id){}
+void info_task(int id,daemon_file_t*){}
 
-void list_tasks(){}
+void list_tasks(daemon_file_t*){}
 
-void print_done_tasks(int id){}
+void print_done_task(int id,daemon_file_t*){} // task must be done 
 
 
 
+int get_shmared_memory(daemon_file_t * communication_file){
+    int shared_memory=shm_open(DAEMON_INPUT_FILE,O_RDWR,S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP);
+    if(shared_memory<0){
+        printf("[error] errno:%d\n",errno);
+        perror(NULL);
+        return EXIT_FAILURE;
+    }
+
+    size_t shared_memory_size=sizeof(daemon_file_t);
+
+
+    if ( ftruncate( shared_memory, shared_memory_size ) == -1) {
+	perror ( NULL );
+    printf("[error] errno:%d\n",errno);
+    return EXIT_FAILURE;
+    }
+
+
+    communication_file=mmap(0,shared_memory_size,PROT_READ|PROT_WRITE,MAP_SHARED,shared_memory,0);
+    if(communication_file==MAP_FAILED){
+        perror(NULL);
+        printf("[error] errno:%d\n",errno);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
 
 int main(int argc ,char** argv){
+    daemon_file_t * communication_file;
+    int status=get_shmared_memory(communication_file);
+    if(status==EXIT_FAILURE) 
+        return EXIT_FAILURE;
 
-
-    if(argc==2){//doar da -l este correct sintactic aici
+    if(argc==2){
         if(check_args(argv[1], "-l", "--list")){
-            list_tasks();
+            list_tasks(communication_file);
             return 0;
         }
         
@@ -112,33 +146,33 @@ int main(int argc ,char** argv){
 
     if(argc==3){ //doar da -S <id>, da -R <id>, etc... sunt prompturi corecte aici
         if(check_args(argv[1], "-R", "--resume")&&(is_natural(argv[2]))){
-            resume_task(atoi(argv[2]));
+            resume_task(atoi(argv[2]),communication_file);
             return 0;
         }
         if(check_args(argv[1],"-a", "--add")){
-            add_task(argv[2],LOW_PRIORITY);
+            add_task(argv[2],LOW_PRIORITY,communication_file);
             return 0;
         }
 
-        /*restul functiilor cand sunt 2 argumente aici*/
+       
         
         if(check_args(argv[1],"-S", "--suspend")&&(is_natural(argv[2]))){
-            suspend_task(atoi(argv[2]));
+            suspend_task(atoi(argv[2]),communication_file);
             return 0;
         }
         
         if(check_args(argv[1], "-r", "--remove")&&(is_natural(argv[2]))){
-            remove_task(atoi(argv[2]));
+            remove_task(atoi(argv[2]),communication_file);
             return 0;
         }
         
         if(check_args(argv[1], "-i", "--info")&&(is_natural(argv[2]))){
-            info_task(atoi(argv[2]));
+            info_task(atoi(argv[2]),communication_file);
             return 0;
         }
         
         if(check_args(argv[1], "-p", "--print")&&(is_natural(argv[2]))){
-            print_done_tasks(atoi(argv[2]));
+            print_done_task(atoi(argv[2]),communication_file);
             return 0;
         }
         
@@ -151,7 +185,7 @@ int main(int argc ,char** argv){
     if(argc==5){
         if(check_args(argv[1], "-a", "--add")&&check_args(argv[3], "-p", "--priority")&&is_priority(argv[4])){
             int priority=atoi(argv[4]);
-            add_task(argv[2],priority);
+            add_task(argv[2],priority,communication_file);
             return 0;
         }
     }
