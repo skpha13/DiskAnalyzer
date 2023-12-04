@@ -1,0 +1,28 @@
+[Unit]
+  Description = Starts the DaemonProcess script 
+
+[Service]
+#the script to execute
+ExecStart = /bin/DaemonProcessDiskAnalyser
+
+Restart = always
+
+
+
+# This section is for the service to start on StartUp
+[Install]
+  WantedBy = multi-user.target
+
+
+
+
+#TO ENABLE THE SERVICE ON STARTUP
+#  sudo systemctl enable DaemonProcess
+#  sudo systemctl daemon-reload  ->it must be reloaded after a manual change
+ 
+
+#TO DISABLE THE SERVICE ON STARTUP
+#  sudo systemctl disable DaemonProcess
+
+#YOU CAN ALSO USE
+#  sudo systemctl restart DaemonProcess

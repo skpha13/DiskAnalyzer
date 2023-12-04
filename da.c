@@ -7,7 +7,7 @@
 
 int is_digit(const char c){
     switch(c){
-    	case '0':
+    	  case '0':
         case '1':
         case '2':
         case '3':
@@ -23,16 +23,13 @@ int is_digit(const char c){
     }
 }
 
-
-
 int is_natural(const char* c){
     if(!*c) return 0;//handle empty string
 
     while (*c)
     {
         if(!is_digit(*c)) return 0;
-        c++;
-        
+        c++;  
     }
     return 1;
 
@@ -51,6 +48,8 @@ int check_args(const char *arg, const char *option1, const char *option2){
 		return 1;
 	return 0;
 }
+
+
 
 void incorrect_args(){
 	printf(
@@ -74,8 +73,6 @@ void help(){
 	"   -h, --help display this help\n\n"
 	);
 }
-
-
 
 void add_task(const char* path,int priority){}
 
@@ -158,6 +155,7 @@ int main(int argc ,char** argv){
             return 0;
         }
     }
+
 
     incorrect_args();
     return -1;
