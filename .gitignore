@@ -50,4 +50,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-a.out
+*.out
+FileSystem
+/cmake-build-debug
+/.idea
