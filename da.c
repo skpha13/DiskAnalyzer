@@ -7,7 +7,7 @@
 
 int is_digit(const char c){
     switch(c){
-    	  case '0':
+    	case '0':
         case '1':
         case '2':
         case '3':
