@@ -19,9 +19,9 @@ int handle_prompt(daemon_file_t*  file){
 	return -1;
 }
 
-int open_and_initialize_shm(daemon_file_t* com_file){
+int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 	openlog("Logs",LOG_PID,LOG_USER);
-
+	daemon_file_t * com_file;
 	shm_unlink(DAEMON_INPUT_FILE);
 	//shared memory is accesible by all users
 	int shared_memory = shm_open(DAEMON_INPUT_FILE,O_CREAT | O_RDWR|O_EXCL , S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP);
@@ -45,7 +45,7 @@ int open_and_initialize_shm(daemon_file_t* com_file){
 			return EXIT_FAILURE;
 		}
 
-com_file = mmap(0, shared_memory_size, PROT_READ|PROT_WRITE, MAP_SHARED, shared_memory, 0);
+	com_file = mmap(0, shared_memory_size, PROT_READ|PROT_WRITE, MAP_SHARED, shared_memory, 0);
 
 	//daemon initialises sync devices
 	if(pthread_mutex_init(&com_file->acces_file, NULL)){
@@ -70,7 +70,7 @@ com_file = mmap(0, shared_memory_size, PROT_READ|PROT_WRITE, MAP_SHARED, shared_
 	}
 	com_file->error = 0;
 	com_file->task_id=0;
-	
+	*p_daemon_file=com_file;
 	return EXIT_SUCCESS;
 }
 
@@ -80,7 +80,7 @@ int main(){
 
 	// opening shared memory and initialize 
 	daemon_file_t *communication_file;
-	int status=open_and_initialize_shm(communication_file);
+	int status=open_and_initialize_shm(&communication_file);
 	if(status==EXIT_FAILURE) 
 		return EXIT_FAILURE;
 	
