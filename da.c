@@ -44,7 +44,7 @@ int is_natural(const char* c){
 int is_priority(const char* c){
     if(is_natural(c)){
         int priority=atoi(c);
-        return (priority==LOW_PRIORITY||priority==NORMAL_PRIORITY||priority==HIGH_PRIORITY);
+        return priority==LOW_PRIORITY || priority==NORMAL_PRIORITY || priority==HIGH_PRIORITY;
     }
     return 0;
 }
@@ -79,17 +79,104 @@ void help(){
 	);
 }
 
-void add_task(const char* path,int priority,daemon_file_t*){}
+void add_task(const char* path,int priority,daemon_file_t* daemon_input){
+    pthread_mutex_lock(&daemon_input->shell_wait);//I am ahead of all disk analyzer shells
+    pthread_mutex_lock(&daemon_input->acces_file);//I have write permissions to the shared file btwn daemon
+    daemon_input->task_type=ADD_TASK;
+    strcpy(daemon_input->path_to_analize,path);
+    daemon_input->priority=priority;
+    daemon_input->next_task_id++;
+    pthread_mutex_unlock(&daemon_input->acces_file);// I let the daemon have acces to the file
+    sem_wait(&daemon_input->shell_continue);// I wait for the daemon to finish in order to continue
+    pthread_mutex_lock(&daemon_input->acces_file); // maybe necessary if daemon spends little time btw cycles
+    if(daemon_input->error==TOO_MANY_TASKS){
+        printf("[error] Too many analisis jobs are being done, please remove some or wait...\n");
+        daemon_input->error=0;
+    }
+    if(daemon_input->error==INVALID_PATH){
+        printf("[error] The path specified is non existent or wrongly formatted\n");
+        daemon_input->error=0;
+    
+    }
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    pthread_mutex_unlock(&daemon_input->shell_wait);
+}
 
-void suspend_task(int id,daemon_file_t*){}
+void suspend_task(int id,daemon_file_t* daemon_input){
+    //to do la final : dc taskul este deja terminat, sa fie avertizat utilizatorul
+    pthread_mutex_lock(&daemon_input->shell_wait);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    daemon_input->task_type=SUSPEND_TASK;
+    daemon_input->task_id=id;
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    sem_wait(&daemon_input->shell_continue);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    if(daemon_input->error==TASK_UNFOUND){
+        printf("[error] Task with job id %d was not given to the daemon to analyze",id);
+        daemon_input->error=0;
+    }
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    pthread_mutex_unlock(&daemon_input->shell_wait);
+}
 
-void resume_task(int id,daemon_file_t*){}
 
-void remove_task(int id,daemon_file_t*){}
+void resume_task(int id,daemon_file_t* daemon_input){
+    //to do la final: dc este deja in rulare, sa fie avertizat in shell
+    pthread_mutex_lock(&daemon_input->shell_wait);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    daemon_input->task_type=RESUME_TASK;
+    daemon_input->task_id=id;
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    sem_wait(&daemon_input->shell_continue);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    if(daemon_input->error==TASK_UNFOUND){
+        daemon_input->error=0;
+        printf("[error] Task with job id %d was not given to the daemon to analyze",id);
+    }
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    pthread_mutex_unlock(&daemon_input->shell_wait);
+}
 
-void info_task(int id,daemon_file_t*){}
+void remove_task(int id,daemon_file_t* daemon_input){
+    pthread_mutex_lock(&daemon_input->shell_wait);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    daemon_input->task_type=REMOVE_TASK;
+    daemon_input->task_id=id;
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    sem_wait(&daemon_input->shell_continue);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    if(daemon_input->error==TASK_UNFOUND){
+        daemon_input->error=0;
+        printf("[error] Task with job id %d was not given to the daemon to analyze",id);
+    }
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    pthread_mutex_unlock(&daemon_input->shell_wait);
+}
 
-void list_tasks(daemon_file_t*){}
+void info_task(int id,daemon_file_t* daemon_input){
+    pthread_mutex_lock(&daemon_input->shell_wait);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    daemon_input->task_type=PROMPT_TASK_INFO;
+    daemon_input->task_id=id;
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    sem_wait(&daemon_input->shell_continue);
+    pthread_mutex_lock(&daemon_input->acces_file);
+    if(daemon_input->error==TASK_UNFOUND){
+        daemon_input->error=0;
+        printf("[error] Task with job id %d was not given to the daemon to analyze",id);
+    
+    }
+    else{
+        puts(daemon_input->path_to_analize);//prin conventie informatia se pune aici
+    }
+    daemon_input->path_to_analize[0]=0;//stergem stringul
+    pthread_mutex_unlock(&daemon_input->acces_file);
+    pthread_mutex_unlock(&daemon_input->shell_wait);
+}
+
+void list_tasks(daemon_file_t*){
+    
+}
 
 void print_done_task(int id,daemon_file_t*){} // task must be done 
 

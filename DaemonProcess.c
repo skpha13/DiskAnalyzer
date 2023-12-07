@@ -69,6 +69,8 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 		return EXIT_FAILURE;
 	}
 	com_file->error = 0;
+	com_file->task_type=0;
+	com_file->next_task_id=0;
 	com_file->task_id=0;
 	*p_daemon_file=com_file;
 	return EXIT_SUCCESS;
@@ -89,10 +91,10 @@ int main(){
 		
 		pthread_mutex_lock(&communication_file->acces_file);
 		
-		if(communication_file->task_id != 0){
+		if(communication_file->task_type != 0){
 
 			handle_prompt(communication_file);
-			communication_file->task_id = 0;
+			communication_file->task_type= 0;
 
 			if(sem_post(&communication_file->shell_continue)){
 				perror(NULL);
