@@ -182,7 +182,7 @@ void print_done_task(int id,daemon_file_t*){} // task must be done
 
 
 
-int get_shmared_memory(daemon_file_t * communication_file){
+int get_shmared_memory(daemon_file_t ** daemon_file){
     int shared_memory=shm_open(DAEMON_INPUT_FILE,O_RDWR,S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP);
     if(shared_memory<0){
         printf("[error] errno:%d\n",errno);
@@ -199,19 +199,20 @@ int get_shmared_memory(daemon_file_t * communication_file){
     return EXIT_FAILURE;
     }
 
-
-    communication_file=mmap(0,shared_memory_size,PROT_READ|PROT_WRITE,MAP_SHARED,shared_memory,0);
-    if(communication_file==MAP_FAILED){
+    daemon_file_t *com_file;
+    com_file=mmap(0,shared_memory_size,PROT_READ|PROT_WRITE,MAP_SHARED,shared_memory,0);
+    if(com_file==MAP_FAILED){
         perror(NULL);
         printf("[error] errno:%d\n",errno);
         return EXIT_FAILURE;
     }
+    *daemon_file=com_file;
     return EXIT_SUCCESS;
 }
 
 int main(int argc ,char** argv){
     daemon_file_t * communication_file;
-    int status=get_shmared_memory(communication_file);
+    int status=get_shmared_memory(&communication_file);
     if(status==EXIT_FAILURE) 
         return EXIT_FAILURE;
 

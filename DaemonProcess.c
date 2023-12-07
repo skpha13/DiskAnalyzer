@@ -25,7 +25,6 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 	shm_unlink(DAEMON_INPUT_FILE);
 	//shared memory is accesible by all users
 	int shared_memory = shm_open(DAEMON_INPUT_FILE,O_CREAT | O_RDWR|O_EXCL , S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP);
-	printf("shared_memory: %d\n",shared_memory);
 
 	
 	if(shared_memory < 0){
