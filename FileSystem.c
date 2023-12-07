@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fts.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,7 +16,7 @@ struct returnValues {
 
 void * folderAnalysis(const char* path) {
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
-    ret->response_code = -1;
+    ret->response_code = 0;
     ret->numberOfFolders = 0;
     ret->size = 0;
 
@@ -26,8 +27,48 @@ void * folderAnalysis(const char* path) {
     
     if (dir == NULL) {
         perror("Failed to open directory\n");
+        ret->response_code = -1;
         return ret;
     }
+
+    struct dirent* dp;
+    struct stat sb;
+
+    while (dir) {
+        errno = 0;
+        dp = readdir(dir);
+
+        if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+            continue;
+
+        if (dp) {
+            char temp[strlen(path)];
+            strcpy(temp, path);
+            strcat(temp, "/");
+            strcat(temp, dp->d_name);
+
+            if (stat(temp, &sb)) {
+                perror("Failed to get file stats\n");
+                ret->response_code = -1;
+                closedir(dir);
+                return ret;
+            }
+
+            if (S_ISDIR(sb.st_mode))
+                folderAnalysis(temp);
+        } else {
+            if (errno == 0) {
+                closedir(dir);
+                return ret;
+            }
+
+            closedir(dir);
+            ret->response_code = -1;
+            return ret;
+        }
+    }
+
+    return ret;
 }
 
 int main(int argc, char* argv[]) {
@@ -37,7 +78,7 @@ int main(int argc, char* argv[]) {
     }
 
     const char* path = argv[1];
-    struct returnValues *ret = folderAnalysis("test");
+    struct returnValues *ret = folderAnalysis(path);
 
     if (ret->response_code == -1) {
         perror("Failed to retrieve information about directory\n");
