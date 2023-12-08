@@ -13,9 +13,11 @@
 
 #define FORMAT_LOG_ERROR "[ERROR] %d \n"
 #define THREAD_POOL_SIZE 5
-
+/*handle prompt sterge TOT dupa ce l-a citit, filozofia este ca dc am primit mezajul este doar pt mine*/
+/*de ex readPath(c) si dupa deletePath(c)*/
 
 int handle_prompt(daemon_file_t*  file){
+	
 	return -1;
 }
 
@@ -61,7 +63,7 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 		return EXIT_FAILURE;
 	}	
 
-	if(sem_init(&com_file->shell_continue, 0, 0)){
+	if(sem_init(&com_file->shell_continue, 1, 0)){
 		perror(NULL);
 		syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
 		closelog();
@@ -86,7 +88,7 @@ int main(){
 		return EXIT_FAILURE;
 	
 	while (1){
-		/*IPC with da shell*/
+		/*IPC with da.c shell*/
 		
 		pthread_mutex_lock(&communication_file->acces_file);
 		
@@ -100,7 +102,8 @@ int main(){
 				syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
 				closelog();
 			}
-
+			
+			fflush(0);
 		}
 		pthread_mutex_unlock(&communication_file->acces_file);
 

@@ -1,6 +1,8 @@
-- [ ] daemon functional (Mihai ,Liviu)
-- [ ] IPC daemon da (Liviu)
-- [ ] da user input (Tavi,Liviu)
+- [X] daemon functional (Mihai ,Liviu)
+- [X] IPC daemon da (Liviu)
+- [X] da user input (Tavi,Liviu)
 - [ ] parcurgerea recursiva a folderului (Adi)
+- [ ] daemonul trimite raspunsul la da.c 
+- [ ] coada cu taskuri (daca sunt mai multe joburi de analiza decat threaduri, sunt puse in asteptare)
 
 

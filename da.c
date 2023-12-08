@@ -79,7 +79,10 @@ void help(){
 	);
 }
 
+
+/*regula: o comunicare cu daemonul poate sa adauge un singur task*/
 void add_task(const char* path,int priority,daemon_file_t* daemon_input){
+    
     pthread_mutex_lock(&daemon_input->shell_wait);//I am ahead of all disk analyzer shells
     pthread_mutex_lock(&daemon_input->acces_file);//I have write permissions to the shared file btwn daemon
     daemon_input->task_type=ADD_TASK;
@@ -87,6 +90,7 @@ void add_task(const char* path,int priority,daemon_file_t* daemon_input){
     daemon_input->priority=priority;
     daemon_input->next_task_id++;
     pthread_mutex_unlock(&daemon_input->acces_file);// I let the daemon have acces to the file
+    
     sem_wait(&daemon_input->shell_continue);// I wait for the daemon to finish in order to continue
     if(daemon_input->error==TOO_MANY_TASKS){
         printf("[error] Too many analisis jobs are being done, please remove some or wait...\n");
@@ -163,6 +167,7 @@ void info_task(int id,daemon_file_t* daemon_input){
     }
     else{
         puts(daemon_input->path_to_analize);//prin conventie informatia se pune aici
+        
     }
     daemon_input->path_to_analize[0]=0;//stergem stringul
     
@@ -199,8 +204,9 @@ void print_done_task(int id,daemon_file_t*daemon_input){
     }
     else{
         puts(daemon_input->path_to_analize);
-        daemon_input->path_to_analize[0]=0;
+        
     }
+    daemon_input->path_to_analize[0]=0;
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }    
 
