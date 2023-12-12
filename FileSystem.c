@@ -34,28 +34,45 @@ void * folderAnalysis(const char* path) {
     struct dirent* dp;
     struct stat sb;
 
-    while (dir) {
+    while ((dp = readdir(dir)) != NULL) {
         errno = 0;
-        dp = readdir(dir);
-
-        if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
-            continue;
 
         if (dp) {
-            char temp[strlen(path)];
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+                continue;
+
+            char temp[strlen(path) + strlen(dp->d_name) + 1];
             strcpy(temp, path);
             strcat(temp, "/");
             strcat(temp, dp->d_name);
 
-            if (stat(temp, &sb)) {
+            if (stat(temp, &sb) == 0) {
+                if (S_ISDIR(sb.st_mode)) {
+                    ret->numberOfFolders++;
+
+                    struct returnValues *ret_subdir = folderAnalysis(temp);
+
+                    if (ret_subdir->response_code == -1) {
+                        ret->response_code = -1;
+                        closedir(dir);
+                        free(ret_subdir);
+                        return ret;
+                    }
+
+                    ret->numberOfFolders += ret_subdir->numberOfFolders;
+                    ret->size += ret_subdir->size;
+
+                    free(ret_subdir);
+
+                } else {
+                    ret->size += sb.st_size;
+                }
+            } else {
                 perror("Failed to get file stats\n");
                 ret->response_code = -1;
                 closedir(dir);
                 return ret;
             }
-
-            if (S_ISDIR(sb.st_mode))
-                folderAnalysis(temp);
         } else {
             if (errno == 0) {
                 closedir(dir);
@@ -68,6 +85,7 @@ void * folderAnalysis(const char* path) {
         }
     }
 
+    closedir(dir);
     return ret;
 }
 
@@ -83,10 +101,13 @@ int main(int argc, char* argv[]) {
     if (ret->response_code == -1) {
         perror("Failed to retrieve information about directory\n");
 
-        if (ret != NULL) 
+        if (ret != NULL)
             free(ret);
-            
+
         return EXIT_FAILURE;
+    } else {
+        printf("Number of folders: %i\n", ret->numberOfFolders);
+        printf("%f MB\n", ret->size / 1e6);
     }
 
     if (ret != NULL) 
