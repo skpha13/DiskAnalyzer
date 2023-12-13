@@ -9,3 +9,9 @@
 #define HIGH_PRIORITY 3
 #define NORMAL_PRIORITY 2
 #define LOW_PRIORITY 1
+
+
+#define INVALID_PATH 1
+#define TOO_MANY_TASKS 2
+#define TASK_UNFOUND 3
+#define TASK_NOT_DONE 4
