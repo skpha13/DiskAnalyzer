@@ -4,12 +4,19 @@
    The first element of the array will be excluded */
 #define MAX_SIZE_PQ 101
 
+//Apology letter for the horrors below
+
+/* A priority_queue of daemon_file_t*,
+   Didn't use the actual objects to avoid
+   using operator= on swaps and copies of 
+   objects ,and easier object passing
+*/
+
 
 typedef struct{
     daemon_file_t **tasks;   //pointer to an array pointers of tasks
     int size;               //number of tasks contained
 }priority_queue;
-
 
 
 //METHODS
