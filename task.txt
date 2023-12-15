@@ -3,6 +3,8 @@
 - [X] da user input (Tavi,Liviu)
 - [ ] parcurgerea recursiva a folderului (Adi)
 - [ ] daemonul trimite raspunsul la da.c 
-- [ ] coada cu taskuri (daca sunt mai multe joburi de analiza decat threaduri, sunt puse in asteptare)
-
+- [X] coada cu taskuri (daca sunt mai multe joburi de analiza decat threaduri, sunt puse in asteptare)
+- [ ] adauga taskuri in coada (Mihai)
+- [ ] hash table int->string (retine folderul pt fiecare task)
+- [ ] functie care verifica daca o cale e valida (pt add task in handle prompt) (Adi)
 
