@@ -30,7 +30,7 @@ void insert_pq(priority_queue* pq, daemon_file_t* task);
 /* Pops the root and repairs the pq property*/
 void pop_pq(priority_queue* pq);
 
-/* Returns the first min unmarked element */
+/* Returns the first max unmarked element */
 daemon_file_t* top_pq(priority_queue* pq);
 
 
@@ -73,10 +73,10 @@ void sift_pq(priority_queue* pq, int node){
         if(left_son_pq(node) <= pq->size){
             son = left_son_pq(node);
             if( right_son_pq(node) <= pq->size && 
-                pq->tasks[right_son_pq(node)]->priority < pq->tasks[left_son_pq(node)]->priority ){
+                pq->tasks[right_son_pq(node)]->priority > pq->tasks[left_son_pq(node)]->priority ){
                     son = right_son_pq(node);
             }
-            if(pq->tasks[son]->priority >= pq->tasks[node]->priority){
+            if(pq->tasks[son]->priority <= pq->tasks[node]->priority){
                 son = 0;
             }
         }
@@ -92,7 +92,7 @@ void sift_pq(priority_queue* pq, int node){
 void percolate_pq(priority_queue* pq, int node){
     daemon_file_t* key = pq->tasks[node];
 
-    while((node > 1) && (key->priority <  pq->tasks[father_pq(node)]->priority)){
+    while((node > 1) && (key->priority >  pq->tasks[father_pq(node)]->priority)){
         pq->tasks[node] = pq->tasks[father_pq(node)]; 
         node = father_pq(node);
     }
