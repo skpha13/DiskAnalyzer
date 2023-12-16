@@ -6,9 +6,9 @@
 #define LIST_TASKS 6
 #define PROMPT_REPORT 7 // doar pentru o sarcina care este gata
 
-#define HIGH_PRIORITY 3
+#define HIGH_PRIORITY 1
 #define NORMAL_PRIORITY 2
-#define LOW_PRIORITY 1
+#define LOW_PRIORITY 3
 
 
 #define INVALID_PATH 1
