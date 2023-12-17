@@ -1,4 +1,5 @@
 #include <stdlib.h>     // For free function
+#include "IPC.h"
 
 /* Max number of elements of the pq
    The first element of the array will be excluded */
