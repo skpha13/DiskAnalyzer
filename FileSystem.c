@@ -57,8 +57,6 @@ void * folderAnalysis(const char* path) {
             strcat(temp, "/");
             strcat(temp, dp->d_name);
 
-//            strcpy(returnOutput[saveIndex].path, dp->d_name);
-
             if (stat(temp, &sb) == 0) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
