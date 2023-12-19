@@ -7,7 +7,7 @@
 
 //Apology letter for the horrors below
 
-/* A priority_queue of daemon_file_t*,
+/* A priority_queue of task_struct*,
    Didn't use the actual objects to avoid
    using operator= on swaps and copies of 
    objects ,and easier object passing
@@ -19,7 +19,7 @@
 
 
 typedef struct{
-    daemon_file_t **tasks;   //pointer to an array pointers of tasks
+    task_struct **tasks;   //pointer to an array pointers of tasks
     int size;               //number of tasks contained
 }priority_queue;
 
@@ -30,20 +30,20 @@ typedef struct{
 int initiate_pq(priority_queue** pq);
 
 /* Inserts an element into the pq */
-void insert_pq(priority_queue* pq, daemon_file_t* task);
+void insert_pq(priority_queue* pq, task_struct* task);
 
 /* Pops the root and repairs the pq property*/
 void pop_pq(priority_queue* pq);
 
 /* Returns the first max unmarked element */
-daemon_file_t* top_pq(priority_queue* pq);
+task_struct* top_pq(priority_queue* pq);
 
 /* Frees the memory used*/
 void free_pq(priority_queue* pq);
 
 
 //HELPERS
-void swap_task(daemon_file_t* a, daemon_file_t* b);
+void swap_task(task_struct* a, task_struct* b);
 int father_pq(int node_index);
 int left_son_pq(int node_index);
 int right_son_pq(int node_index);
@@ -53,8 +53,8 @@ void lazy_deletion_pq(priority_queue* pq);
 
 
 /////////////DEFINITIONS/////////////
-void swap_task(daemon_file_t* a, daemon_file_t* b){
-    daemon_file_t temp = *a;
+void swap_task(task_struct* a, task_struct* b){
+    task_struct temp = *a;
     *a = *b;
     *b = temp;
 }
@@ -97,7 +97,7 @@ void sift_pq(priority_queue* pq, int node){
 
 /* Used in the insert_pq function to lift an element up*/
 void percolate_pq(priority_queue* pq, int node){
-    daemon_file_t* key = pq->tasks[node];
+    task_struct* key = pq->tasks[node];
 
     while((node > 1) && (key->priority >  pq->tasks[father_pq(node)]->priority)){
         pq->tasks[node] = pq->tasks[father_pq(node)]; 
@@ -121,7 +121,7 @@ int initiate_pq(priority_queue** pq){
     (*pq)->size = 0;
 
     // Allocating memory for the array
-    (*pq)->tasks = (daemon_file_t**)malloc(MAX_SIZE_PQ * sizeof(daemon_file_t*));
+    (*pq)->tasks = (task_struct**)malloc(MAX_SIZE_PQ * sizeof(task_struct*));
    
     // Check if memory is allocated for the array
     if((*pq)->tasks == NULL){
@@ -131,7 +131,7 @@ int initiate_pq(priority_queue** pq){
     for(int i = 0 ; i < MAX_SIZE_PQ ; i++){
         
         // Allocate every pointer of tasks
-        (*pq)->tasks[i] = (daemon_file_t*)malloc(sizeof(daemon_file_t));
+        (*pq)->tasks[i] = (task_struct*)malloc(sizeof(task_struct));
         
         // Check for errors 
         if((*pq)->tasks[i] == NULL){
@@ -150,7 +150,7 @@ int initiate_pq(priority_queue** pq){
     return 0;
 }
 
-void insert_pq(priority_queue* pq, daemon_file_t* task){
+void insert_pq(priority_queue* pq, task_struct* task){
     pq->size = pq->size + 1;
     pq->tasks[pq->size] = task;
     percolate_pq(pq, pq->size);
@@ -160,7 +160,8 @@ void insert_pq(priority_queue* pq, daemon_file_t* task){
    get on top*/
 void lazy_deletion_pq(priority_queue* pq){
 
-    while(pq->tasks[1]->deleted && pq->size > 0){
+    // task_type 4 means the task was deleted
+    while(pq->tasks[1]->task_type == 4 && pq->size > 0){
 
         if(pq->size == 1){
             pq->size = pq->size - 1;
@@ -200,7 +201,7 @@ void pop_pq(priority_queue* pq){
     
 }   
 
-daemon_file_t* top_pq(priority_queue* pq){
+task_struct* top_pq(priority_queue* pq){
 
     lazy_deletion_pq(pq);
 
@@ -213,16 +214,15 @@ daemon_file_t* top_pq(priority_queue* pq){
 }
 
 
-
 void free_pq(priority_queue* pq){
     
-    // Free's every single pointer of the array
+    // Frees every single pointer of the array
     for(int i = 0 ; i < MAX_SIZE_PQ ; i++)   
             free(pq->tasks[i]);
 
-    // Free's the pointer to the array
+    // Frees the pointer to the array
     free(pq->tasks);
 
-    // Free's the priority queue
+    // Frees the priority queue
     free(pq);
 }
