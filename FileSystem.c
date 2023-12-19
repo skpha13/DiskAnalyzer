@@ -6,13 +6,24 @@
 #include <fts.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdbool.h>
+#include <math.h>
 
 struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded
     int response_code;
     int numberOfFolders;
-    long long size;
+    long size;
 };
+
+struct output {
+    char path[PATH_MAX];
+    struct returnValues data;
+};
+
+//int indexOutput = 0;
+struct output returnOutput[101];
+int indexOutput = 0;
 
 void * folderAnalysis(const char* path) {
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
@@ -20,9 +31,6 @@ void * folderAnalysis(const char* path) {
     ret->numberOfFolders = 0;
     ret->size = 0;
 
-    int numberOfFolders = 0;
-    long long size = 0;
-    
     DIR *dir = opendir(path);
     
     if (dir == NULL) {
@@ -30,6 +38,9 @@ void * folderAnalysis(const char* path) {
         ret->response_code = -1;
         return ret;
     }
+
+    int saveIndex = indexOutput;
+    strcpy(returnOutput[indexOutput++].path, path);
 
     struct dirent* dp;
     struct stat sb;
@@ -56,6 +67,7 @@ void * folderAnalysis(const char* path) {
                         ret->response_code = -1;
                         closedir(dir);
                         free(ret_subdir);
+                        returnOutput[indexOutput].data = *ret;
                         return ret;
                     }
 
@@ -71,22 +83,31 @@ void * folderAnalysis(const char* path) {
                 perror("Failed to get file stats\n");
                 ret->response_code = -1;
                 closedir(dir);
+                returnOutput[indexOutput].data = *ret;
                 return ret;
             }
         } else {
             if (errno == 0) {
                 closedir(dir);
+                returnOutput[indexOutput].data = *ret;
                 return ret;
             }
 
             closedir(dir);
             ret->response_code = -1;
+            returnOutput[indexOutput].data = *ret;
             return ret;
         }
     }
 
+    returnOutput[saveIndex].data = *ret;
+
     closedir(dir);
     return ret;
+}
+
+float calculatePercent(long size, long fullSize) {
+    return (size * 100) / fullSize;
 }
 
 int main(int argc, char* argv[]) {
@@ -106,8 +127,21 @@ int main(int argc, char* argv[]) {
 
         return EXIT_FAILURE;
     } else {
-        printf("Number of folders: %i\n", ret->numberOfFolders);
-        printf("%f MB\n", ret->size / 1e6);
+        bool fullPath = true;
+        if (fullPath == false) {
+            printf("Number of folders: %i\n", ret->numberOfFolders);
+            printf("%f MB\n", ret->size / 1e6);
+        } else {
+            printf("%s %.2f%\t%fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
+            for (int i=1; i<indexOutput; i++) {
+                printf("|-%s %.2f\t%fMB\n",returnOutput[i].path, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
+
+                int numberOfFolders = returnOutput[i].data.numberOfFolders;
+                for (int j = i+1; j<= i + numberOfFolders; j++) {
+                    printf("|-%s %.2f%\t%fMB\n", returnOutput[j].path, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[0].data.size / 1e6);
+                }
+            }
+        }
     }
 
     if (ret != NULL) 
