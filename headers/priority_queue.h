@@ -38,6 +38,10 @@ void pop_pq(priority_queue* pq);
 /* Returns the first max unmarked element */
 task_struct* top_pq(priority_queue* pq);
 
+/* Returns the specified task and deletes it from pq
+    On failure returns NULL*/
+task_struct* suspend_task(priority_queue* pq, int task);
+
 /* Frees the memory used*/
 void free_pq(priority_queue* pq);
 
@@ -213,6 +217,37 @@ task_struct* top_pq(priority_queue* pq){
 
 }
 
+task_struct* suspend_task(priority_queue* pq, int task_id){
+    
+    // Allocate memory for the return value
+    task_struct* ret = (task_struct*)malloc(sizeof(task_struct*));
+
+    // Find the position of the task
+    int index = -1;
+    for(int i = 1 ; i <= pq->size ; i++)
+        if(pq->tasks[i]->task_id == task_id)
+            index = i;
+
+    // If the task is not there or is marked deleted return NULL
+    if(index < 1 || pq->tasks[index]->task_type == 4){
+        free(ret);
+        return NULL;
+    }
+
+    // Save the task
+    ret = pq->tasks[index];
+
+    // Swap the node with the last leaf
+    pq->tasks[index] = pq->tasks[pq->size];
+    pq->size = pq->size - 1;
+
+    if(pq->tasks[index] > pq->tasks[father_pq(index)])
+        percolate_pq(pq,index);
+    else
+        sift_pq(pq,index);
+
+    return ret;
+}
 
 void free_pq(priority_queue* pq){
     
