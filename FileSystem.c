@@ -22,7 +22,7 @@ struct output {
 };
 
 //int indexOutput = 0;
-struct output returnOutput[101];
+struct output returnOutput[1000];
 int indexOutput = 0;
 
 void * folderAnalysis(const char* path) {
@@ -40,7 +40,7 @@ void * folderAnalysis(const char* path) {
     }
 
     int saveIndex = indexOutput;
-    strcpy(returnOutput[indexOutput++].path, path);
+    strcpy(returnOutput[saveIndex].path, path);
 
     struct dirent* dp;
     struct stat sb;
@@ -57,9 +57,12 @@ void * folderAnalysis(const char* path) {
             strcat(temp, "/");
             strcat(temp, dp->d_name);
 
+//            strcpy(returnOutput[saveIndex].path, dp->d_name);
+
             if (stat(temp, &sb) == 0) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
+                    indexOutput++;
 
                     struct returnValues *ret_subdir = folderAnalysis(temp);
 
@@ -67,7 +70,7 @@ void * folderAnalysis(const char* path) {
                         ret->response_code = -1;
                         closedir(dir);
                         free(ret_subdir);
-                        returnOutput[indexOutput].data = *ret;
+                        returnOutput[saveIndex].data = *ret;
                         return ret;
                     }
 
@@ -83,19 +86,19 @@ void * folderAnalysis(const char* path) {
                 perror("Failed to get file stats\n");
                 ret->response_code = -1;
                 closedir(dir);
-                returnOutput[indexOutput].data = *ret;
+                returnOutput[saveIndex].data = *ret;
                 return ret;
             }
         } else {
             if (errno == 0) {
                 closedir(dir);
-                returnOutput[indexOutput].data = *ret;
+                returnOutput[saveIndex].data = *ret;
                 return ret;
             }
 
             closedir(dir);
             ret->response_code = -1;
-            returnOutput[indexOutput].data = *ret;
+            returnOutput[saveIndex].data = *ret;
             return ret;
         }
     }
@@ -133,16 +136,26 @@ int main(int argc, char* argv[]) {
             printf("%f MB\n", ret->size / 1e6);
         } else {
             printf("%s %.2f%\t%fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
+            int pathSizeOfParent = strlen(returnOutput[0].path);
             for (int i=1; i<indexOutput; i++) {
-                printf("|-%s %.2f\t%fMB\n",returnOutput[i].path, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
-
+                printf("|-%s %.2f%\t%fMB\n",returnOutput[i].path + pathSizeOfParent, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
+//                pathSizeOfParent = strlen(returnOutput[i].path);
                 int numberOfFolders = returnOutput[i].data.numberOfFolders;
-                for (int j = i+1; j<= i + numberOfFolders; j++) {
-                    printf("|-%s %.2f%\t%fMB\n", returnOutput[j].path, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[0].data.size / 1e6);
+                int j = i+1;
+                for (; j<= i + numberOfFolders; j++) {
+                    printf("|-%s %.2f%\t%fMB\n", returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[j].data.size / 1e6);
                 }
+                printf("\n");
+                i = j+1;
             }
         }
     }
+    //TODO: BUG
+    /*
+     for desktop path => a million directories which is wrong
+     for uni-work its correct
+     think its becuse desktop has home direcoty, home has desktop directory => infinite recursion
+     */
 
     if (ret != NULL) 
         free(ret);
