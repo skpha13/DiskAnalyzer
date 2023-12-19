@@ -1,4 +1,4 @@
-#include <stdlib.h>      // For free function
+#include <stdlib.h>     // For free function
 #include "task_struct.h"
 
 /* Max number of elements of the pq

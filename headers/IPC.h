@@ -7,7 +7,6 @@ typedef struct{
     int error;
     int task_id;
     int next_task_id;
-    int deleted;    // 1->the task is marked as deleted, 0-> the task is still valid          
     char  path_to_analize[1000000];
     pthread_mutex_t shell_wait, acces_file;
     sem_t shell_continue;
