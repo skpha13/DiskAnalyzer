@@ -1,5 +1,9 @@
 #include <stdlib.h>     // For free function
+<<<<<<< HEAD
 #include "IPC.h"
+=======
+#include "IPC.h"        // For daemon_file_t 
+>>>>>>> Matoka26
 
 /* Max number of elements of the pq
    The first element of the array will be excluded */
@@ -11,6 +15,10 @@
    Didn't use the actual objects to avoid
    using operator= on swaps and copies of 
    objects ,and easier object passing
+*/
+
+/* The contents of the pq must be allocated 
+   with malloc and inserted by that pointer
 */
 
 
@@ -34,6 +42,8 @@ void pop_pq(priority_queue* pq);
 /* Returns the first max unmarked element */
 daemon_file_t* top_pq(priority_queue* pq);
 
+/* Frees the memory used*/
+void free_pq(priority_queue* pq);
 
 
 //HELPERS
@@ -204,4 +214,19 @@ daemon_file_t* top_pq(priority_queue* pq){
     // After deleting the marked nodes,return the top
     return pq->tasks[1];
 
+}
+
+
+
+void free_pq(priority_queue* pq){
+    
+    // Free's every single pointer of the array
+    for(int i = 0 ; i < MAX_SIZE_PQ ; i++)   
+            free(pq->tasks[i]);
+
+    // Free's the pointer to the array
+    free(pq->tasks);
+
+    // Free's the priority queue
+    free(pq);
 }
