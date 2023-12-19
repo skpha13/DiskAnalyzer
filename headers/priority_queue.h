@@ -1,5 +1,5 @@
 #include <stdlib.h>      // For free function
-#include "task_struct.h" 
+#include "task_struct.h"
 
 /* Max number of elements of the pq
    The first element of the array will be excluded */
