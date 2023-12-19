@@ -135,17 +135,23 @@ int main(int argc, char* argv[]) {
             printf("Number of folders: %i\n", ret->numberOfFolders);
             printf("%f MB\n", ret->size / 1e6);
         } else {
-            printf("%s %.2f%\t%fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
+            printf("%s/ %.2f%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
             int pathSizeOfParent = strlen(returnOutput[0].path);
-            for (int i=1; i<indexOutput; i++) {
-                printf("|-%s %.2f%\t%fMB\n",returnOutput[i].path + pathSizeOfParent, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
-//                pathSizeOfParent = strlen(returnOutput[i].path);
+            //TODO: /desktop/Pictures
+            /*
+                for this path it doesnt print the last folder
+                problem: how numberOfFolders is manipulated
+            */
+            for (int i=1; i<=indexOutput; i++) {
+                //TODO: attribute hasMoreFolders
+                // it can help with the printing
+                printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[i].path + pathSizeOfParent, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
                 int numberOfFolders = returnOutput[i].data.numberOfFolders;
                 int j = i+1;
                 for (; j<= i + numberOfFolders; j++) {
-                    printf("|-%s %.2f%\t%fMB\n", returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[j].data.size / 1e6);
+                    printf("|-%s/ %.2f%\t%.1fMB\n", returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[j].data.size / 1e6);
                 }
-                printf("\n");
+                printf("|\n");
                 i = j+1;
             }
         }
