@@ -1,9 +1,5 @@
 #include <stdlib.h>     // For free function
-<<<<<<< HEAD
-#include "IPC.h"
-=======
-#include "IPC.h"        // For daemon_file_t 
->>>>>>> Matoka26
+#include "task_struct.h"
 
 /* Max number of elements of the pq
    The first element of the array will be excluded */
