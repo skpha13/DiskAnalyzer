@@ -57,15 +57,6 @@ int check_args(const char *arg, const char *option1, const char *option2){
 	
 }
 
-bool isValidPath(const char* path) {
-    DIR* dir = opendir(path);
-    if (dir == NULL) {
-        return false;
-    }
-
-    return true;
-}
-
 void incorrect_args(){
 	printf(
 	"Unrecognized command\n"
@@ -98,19 +89,17 @@ void add_task(const char* path,int priority,daemon_file_t* daemon_input){
     daemon_input->task_type=ADD_TASK;
     strcpy(daemon_input->path_to_analize,path);
     daemon_input->priority=priority;
-    daemon_input->next_task_id++;
     pthread_mutex_unlock(&daemon_input->acces_file);// I let the daemon have acces to the file
     
     sem_wait(&daemon_input->shell_continue);// I wait for the daemon to finish in order to continue
     if(daemon_input->error==TOO_MANY_TASKS){
         printf("[error] Too many analisis jobs are being done, please remove some or wait...\n");
         daemon_input->error=0;
-    }
-    if(daemon_input->error==INVALID_PATH){
-        printf("[error] The path specified is non existent or wrongly formatted\n");
-        daemon_input->error=0;
-    
-    }
+    }else if(daemon_input->error==INVALID_PATH){
+		printf("[error] The path specified is non existent or wrongly formatted\n");
+		daemon_input->error=0;
+    }else
+	puts(daemon_input->path_to_analize);
     
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }
