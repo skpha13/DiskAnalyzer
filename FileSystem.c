@@ -109,22 +109,50 @@ float calculatePercent(long size, long fullSize) {
     return (size * 100) / fullSize;
 }
 
-// TODO: make this recursive
-void analyzeOutput(const struct output returnOutput[], int numberOfFolders, int pathSizeOfParent) {
-    int j = 1;
+// Old Recursive function, could be useful if we want to print information any other way,
+// than specified in the task
+/*int analyzeOutput(struct output returnOutput[], int startIndex, int pathSizeOfParent) {
+    printf("|-%s/ %.2f%%\t%.1fMB\n",
+           returnOutput[startIndex].path + pathSizeOfParent,
+           calculatePercent(returnOutput[startIndex].data.size, returnOutput[0].data.size),
+           returnOutput[startIndex].data.size / 1e6);
+
+    int numberOfFolders = returnOutput[startIndex].data.numberOfFolders;
+    if (numberOfFolders < 1) return startIndex+1;
+
+    int newIndex = startIndex + 1;
     for (int i=0; i<numberOfFolders; i++) {
-        int numberOfSubFolders = returnOutput[j].data.numberOfFolders;
-        printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, returnOutput[0].data.size), returnOutput[j].data.size / 1e6);
-        int k = j+1;
-        if (numberOfSubFolders < 1) {
-            j = k;
-            continue;
+        newIndex = analyzeOutput(returnOutput, newIndex, pathSizeOfParent);
+    }
+
+    printf("|\n");
+
+    return newIndex;
+}*/
+
+void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
+    int numberOfFolders = returnOutput[0].data.numberOfFolders;
+    int i = 1;
+
+    while (numberOfFolders) {
+        int counter = 0;
+        for (; i<=indexOutput; i++) {
+            printf("|-%s/ %.2f%%\t%.1fMB\n",
+                   returnOutput[i].path + pathSizeOfParent,
+                   calculatePercent(returnOutput[i].data.size, returnOutput[0].data.size),
+                   returnOutput[i].data.size / 1e6);
+
+            counter += returnOutput[i].data.numberOfFolders;
+            if (counter < 1) {
+                i++;
+                break;
+            }
+
+            counter--;
         }
-        for (; k<j+1+numberOfSubFolders; k++) {
-            printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[k].path + pathSizeOfParent, calculatePercent(returnOutput[k].data.size, returnOutput[0].data.size), returnOutput[k].data.size / 1e6);
-        }
-        j = k;
-        printf("\n");
+
+        if (numberOfFolders > 1) printf("|\n");
+        numberOfFolders--;
     }
 }
 
@@ -150,20 +178,9 @@ int main(int argc, char* argv[]) {
             printf("Number of folders: %i\n", ret->numberOfFolders);
             printf("%f MB\n", ret->size / 1e6);
         } else {
-            printf("%s/ %.2f%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
+            printf("%s/ %.2f%%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
             int pathSizeOfParent = strlen(returnOutput[0].path);
-            analyzeOutput(returnOutput, returnOutput[0].data.numberOfFolders, pathSizeOfParent);
-            /*
-            for (int i=1; i<=indexOutput; i++) {
-                printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[i].path + pathSizeOfParent, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
-                int numberOfFolders = returnOutput[i].data.numberOfFolders;
-                int j = i+1;
-                for (; j<= i + numberOfFolders; j++) {
-                    printf("|-%s/ %.2f%\t%.1fMB\n", returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, ret->size), returnOutput[j].data.size / 1e6);
-                }
-                printf("|\n");
-                i = j+1;
-            }*/
+            analyzeOutput(returnOutput, pathSizeOfParent);
         }
     }
 
@@ -172,3 +189,5 @@ int main(int argc, char* argv[]) {
 
     return EXIT_SUCCESS;
 }
+
+// TODO: percent doesnt add up, because of rounding
