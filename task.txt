@@ -1,10 +1,10 @@
 - [X] daemon functional (Mihai ,Liviu)
 - [X] IPC daemon da (Liviu)
 - [X] da user input (Tavi,Liviu)
-- [ ] parcurgerea recursiva a folderului (Adi)
+- [X] parcurgerea recursiva a folderului (Adi)
 - [ ] daemonul trimite raspunsul la da.c 
 - [X] coada cu taskuri (daca sunt mai multe joburi de analiza decat threaduri, sunt puse in asteptare)
 - [ ] adauga taskuri in coada (Mihai)
 - [ ] hash table int->string (retine folderul pt fiecare task)
-- [ ] functie care verifica daca o cale e valida (pt add task in handle prompt) (Adi)
+- [X] functie care verifica daca o cale e valida (pt add task in handle prompt) (Adi)
 
