@@ -30,7 +30,7 @@ $> da -l
 ID PRI Path Done Status Details
 2 *** /home/user/my_repo 45% in progress 2306 files, 11 dirs
 $> da -l
-6
+
 ID PRI Path Done Status Details
 2 *** /home/user/my_repo 75% in progress 3201 files, 15 dirs
 $> da -p 2
