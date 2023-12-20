@@ -21,8 +21,7 @@ struct output {
     struct returnValues data;
 };
 
-//int indexOutput = 0;
-struct output returnOutput[1000];
+struct output returnOutput[PATH_MAX];
 int indexOutput = 0;
 
 void * folderAnalysis(const char* path) {
@@ -32,7 +31,7 @@ void * folderAnalysis(const char* path) {
     ret->size = 0;
 
     DIR *dir = opendir(path);
-    
+
     if (dir == NULL) {
         perror("Failed to open directory\n");
         ret->response_code = -1;
@@ -57,8 +56,6 @@ void * folderAnalysis(const char* path) {
             strcat(temp, "/");
             strcat(temp, dp->d_name);
 
-//            strcpy(returnOutput[saveIndex].path, dp->d_name);
-
             if (stat(temp, &sb) == 0) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
@@ -74,7 +71,6 @@ void * folderAnalysis(const char* path) {
                         return ret;
                     }
 
-                    ret->numberOfFolders += ret_subdir->numberOfFolders;
                     ret->size += ret_subdir->size;
 
                     free(ret_subdir);
@@ -113,10 +109,29 @@ float calculatePercent(long size, long fullSize) {
     return (size * 100) / fullSize;
 }
 
+// TODO: make this recursive
+void analyzeOutput(const struct output returnOutput[], int numberOfFolders, int pathSizeOfParent) {
+    int j = 1;
+    for (int i=0; i<numberOfFolders; i++) {
+        int numberOfSubFolders = returnOutput[j].data.numberOfFolders;
+        printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[j].path + pathSizeOfParent, calculatePercent(returnOutput[j].data.size, returnOutput[0].data.size), returnOutput[j].data.size / 1e6);
+        int k = j+1;
+        if (numberOfSubFolders < 1) {
+            j = k;
+            continue;
+        }
+        for (; k<j+1+numberOfSubFolders; k++) {
+            printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[k].path + pathSizeOfParent, calculatePercent(returnOutput[k].data.size, returnOutput[0].data.size), returnOutput[k].data.size / 1e6);
+        }
+        j = k;
+        printf("\n");
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         printf("Given number of arguments: %i, expected: 1\n", (argc-1));
-        return EXIT_FAILURE; 
+        return EXIT_FAILURE;
     }
 
     const char* path = argv[1];
@@ -137,14 +152,9 @@ int main(int argc, char* argv[]) {
         } else {
             printf("%s/ %.2f%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
             int pathSizeOfParent = strlen(returnOutput[0].path);
-            //TODO: /desktop/Pictures
+            analyzeOutput(returnOutput, returnOutput[0].data.numberOfFolders, pathSizeOfParent);
             /*
-                for this path it doesnt print the last folder
-                problem: how numberOfFolders is manipulated
-            */
             for (int i=1; i<=indexOutput; i++) {
-                //TODO: attribute hasMoreFolders
-                // it can help with the printing
                 printf("|-%s/ %.2f%\t%.1fMB\n",returnOutput[i].path + pathSizeOfParent, calculatePercent(returnOutput[i].data.size, ret->size), returnOutput[i].data.size / 1e6);
                 int numberOfFolders = returnOutput[i].data.numberOfFolders;
                 int j = i+1;
@@ -153,17 +163,11 @@ int main(int argc, char* argv[]) {
                 }
                 printf("|\n");
                 i = j+1;
-            }
+            }*/
         }
     }
-    //TODO: BUG
-    /*
-     for desktop path => a million directories which is wrong
-     for uni-work its correct
-     think its becuse desktop has home direcoty, home has desktop directory => infinite recursion
-     */
 
-    if (ret != NULL) 
+    if (ret != NULL)
         free(ret);
 
     return EXIT_SUCCESS;

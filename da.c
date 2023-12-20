@@ -11,6 +11,9 @@
 #include <sys/stat.h>        /* For mode constants */
 #include <fcntl.h>           /* For O_* constants */
 #include<unistd.h>
+#include <stdbool.h>
+#include <dirent.h>
+
 int is_digit(const char c){
     switch(c){
     	case '0':
@@ -54,7 +57,14 @@ int check_args(const char *arg, const char *option1, const char *option2){
 	
 }
 
+bool isValidPath(const char* path) {
+    DIR* dir = opendir(path);
+    if (dir == NULL) {
+        return false;
+    }
 
+    return true;
+}
 
 void incorrect_args(){
 	printf(
