@@ -164,8 +164,8 @@ void insert_pq(priority_queue* pq, task_struct* task){
    get on top*/
 void lazy_deletion_pq(priority_queue* pq){
 
-    // task_type 4 means the task was deleted
-    while(pq->tasks[1]->task_type == 4 && pq->size > 0){
+    // deleted 1 means the task was deleted
+    while(pq->tasks[1]->deleted == 1 && pq->size > 0){
 
         if(pq->size == 1){
             pq->size = pq->size - 1;
@@ -229,7 +229,7 @@ task_struct* suspend_task(priority_queue* pq, int task_id){
             index = i;
 
     // If the task is not there or is marked deleted return NULL
-    if(index < 1 || pq->tasks[index]->task_type == 4){
+    if(index < 1 || pq->tasks[index]->deleted == 1){
         free(ret);
         return NULL;
     }
