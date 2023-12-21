@@ -13,6 +13,7 @@ struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded
     int response_code;
     int numberOfFolders;
+    int numberOfFiles;
     long size;
 };
 
@@ -29,6 +30,7 @@ void * folderAnalysis(const char* path) {
     ret->response_code = 0;
     ret->numberOfFolders = 0;
     ret->size = 0;
+    ret->numberOfFiles = 0;
 
     DIR *dir = opendir(path);
 
@@ -72,11 +74,13 @@ void * folderAnalysis(const char* path) {
                     }
 
                     ret->size += ret_subdir->size;
+                    ret->numberOfFiles += ret_subdir->numberOfFiles;
 
                     free(ret_subdir);
 
                 } else {
                     ret->size += sb.st_size;
+                    ret->numberOfFiles++;
                 }
             } else {
                 perror("Failed to get file stats\n");
