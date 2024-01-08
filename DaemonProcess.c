@@ -18,7 +18,9 @@
 /*de ex readPath(c) si dupa deletePath(c)*/
 
 int handle_prompt(daemon_file_t*  file){
-	
+	if (file->task_type == ADD_TASK) {
+
+    }
 	return -1;
 }
 

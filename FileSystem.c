@@ -3,11 +3,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
-#include <fts.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <stdbool.h>
-#include <math.h>
 
 struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded
@@ -22,10 +19,20 @@ struct output {
     struct returnValues data;
 };
 
-struct output returnOutput[PATH_MAX];
+// TODO: how to estimate current progress
+struct task_info {
+    int suspend_index;
+    struct output returnOutput[PATH_MAX];
+    struct returnValues running_info;
+} taskInfo;
+
 int indexOutput = 0;
 
 void * folderAnalysis(const char* path) {
+    /*while(isSuspended) {
+        sleep(1);
+    }*/
+
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
     ret->response_code = 0;
     ret->numberOfFolders = 0;
@@ -41,7 +48,7 @@ void * folderAnalysis(const char* path) {
     }
 
     int saveIndex = indexOutput;
-    strcpy(returnOutput[saveIndex].path, path);
+    strcpy(taskInfo.returnOutput[saveIndex].path, path);
 
     struct dirent* dp;
     struct stat sb;
@@ -61,6 +68,7 @@ void * folderAnalysis(const char* path) {
             if (stat(temp, &sb) == 0) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
+                    taskInfo.running_info.numberOfFolders ++;
                     indexOutput++;
 
                     struct returnValues *ret_subdir = folderAnalysis(temp);
@@ -69,7 +77,7 @@ void * folderAnalysis(const char* path) {
                         ret->response_code = -1;
                         closedir(dir);
                         free(ret_subdir);
-                        returnOutput[saveIndex].data = *ret;
+                        taskInfo.returnOutput[saveIndex].data = *ret;
                         return ret;
                     }
 
@@ -79,6 +87,9 @@ void * folderAnalysis(const char* path) {
                     free(ret_subdir);
 
                 } else {
+                    taskInfo.running_info.size += sb.st_size;
+                    taskInfo.running_info.numberOfFiles++;
+
                     ret->size += sb.st_size;
                     ret->numberOfFiles++;
                 }
@@ -86,24 +97,24 @@ void * folderAnalysis(const char* path) {
                 perror("Failed to get file stats\n");
                 ret->response_code = -1;
                 closedir(dir);
-                returnOutput[saveIndex].data = *ret;
+                taskInfo.returnOutput[saveIndex].data = *ret;
                 return ret;
             }
         } else {
             if (errno == 0) {
                 closedir(dir);
-                returnOutput[saveIndex].data = *ret;
+                taskInfo.returnOutput[saveIndex].data = *ret;
                 return ret;
             }
 
             closedir(dir);
             ret->response_code = -1;
-            returnOutput[saveIndex].data = *ret;
+            taskInfo.returnOutput[saveIndex].data = *ret;
             return ret;
         }
     }
 
-    returnOutput[saveIndex].data = *ret;
+    taskInfo.returnOutput[saveIndex].data = *ret;
 
     closedir(dir);
     return ret;
@@ -112,27 +123,6 @@ void * folderAnalysis(const char* path) {
 float calculatePercent(long size, long fullSize) {
     return (size * 100) / fullSize;
 }
-
-// Old Recursive function, could be useful if we want to print information any other way,
-// than specified in the task
-/*int analyzeOutput(struct output returnOutput[], int startIndex, int pathSizeOfParent) {
-    printf("|-%s/ %.2f%%\t%.1fMB\n",
-           returnOutput[startIndex].path + pathSizeOfParent,
-           calculatePercent(returnOutput[startIndex].data.size, returnOutput[0].data.size),
-           returnOutput[startIndex].data.size / 1e6);
-
-    int numberOfFolders = returnOutput[startIndex].data.numberOfFolders;
-    if (numberOfFolders < 1) return startIndex+1;
-
-    int newIndex = startIndex + 1;
-    for (int i=0; i<numberOfFolders; i++) {
-        newIndex = analyzeOutput(returnOutput, newIndex, pathSizeOfParent);
-    }
-
-    printf("|\n");
-
-    return newIndex;
-}*/
 
 void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
     int numberOfFolders = returnOutput[0].data.numberOfFolders;
@@ -161,6 +151,13 @@ void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
 }
 
 int main(int argc, char* argv[]) {
+    for(int i=0; i<PATH_MAX; i++) {
+        taskInfo.returnOutput[i].data.response_code = 0;
+        taskInfo.returnOutput[i].data.size = 0;
+        taskInfo.returnOutput[i].data.numberOfFolders = 0;
+        taskInfo.returnOutput[i].data.numberOfFiles = 0;
+    }
+
     if (argc != 2) {
         printf("Given number of arguments: %i, expected: 1\n", (argc-1));
         return EXIT_FAILURE;
@@ -182,9 +179,9 @@ int main(int argc, char* argv[]) {
             printf("Number of folders: %i\n", ret->numberOfFolders);
             printf("%f MB\n", ret->size / 1e6);
         } else {
-            printf("%s/ %.2f%%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
-            int pathSizeOfParent = strlen(returnOutput[0].path);
-            analyzeOutput(returnOutput, pathSizeOfParent);
+            printf("%s/ %.2f%%\t%.1fMB\n|\n",taskInfo.returnOutput[0].path, 100.0f, taskInfo.returnOutput[0].data.size / 1e6);
+            int pathSizeOfParent = strlen(taskInfo.returnOutput[0].path);
+            analyzeOutput(taskInfo.returnOutput, pathSizeOfParent);
         }
     }
 
