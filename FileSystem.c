@@ -70,7 +70,17 @@ void * folderAnalysis(const char* path) {
                     ret->numberOfFolders++;
                     taskInfo.running_info.numberOfFolders ++;
                     indexOutput++;
-
+                    /*
+                        // ! adaugam atribut de isAnalyzed pentru a putea da resume
+                        if (isSuspended == false) {
+                            // continuam parcurgerea recursiva
+                            struct returnValues *ret_subdir = folderAnalysis(temp);
+                        } else {
+                            // salvam indexul la care suntem
+                            lastIndex = savedIndex;
+                            // lasam functia sa se termine natural (pentru a scrie tot ce a analizat in taskInfo.returnOutput
+                        }
+                    */
                     struct returnValues *ret_subdir = folderAnalysis(temp);
 
                     if (ret_subdir->response_code == -1) {
@@ -192,3 +202,5 @@ int main(int argc, char* argv[]) {
 }
 
 // TODO: percent doesnt add up, because of rounding
+// TODO: create another thread to analize folder BFS (count nr. of of folders it has)
+        // and count the number of folder analized
