@@ -202,5 +202,3 @@ int main(int argc, char* argv[]) {
 }
 
 // TODO: percent doesnt add up, because of rounding
-// TODO: create another thread to analize folder BFS (count nr. of of folders it has)
-        // and count the number of folder analized

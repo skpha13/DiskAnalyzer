@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <semaphore.h>
 #include <stdio.h>
+#include <string.h>
+#include <dirent.h>
 
 #define FORMAT_LOG_ERROR "[ERROR] %d \n"
 #define THREAD_POOL_SIZE 5
@@ -18,11 +20,89 @@
 /*de ex readPath(c) si dupa deletePath(c)*/
 
 int handle_prompt(daemon_file_t*  file){
-	if (file->task_type == ADD_TASK) {
+    if (file->task_type == ADD_TASK) {
 
     }
-	return -1;
+    return -1;
 }
+
+
+// ================= THREAD POOL =================
+pthread_mutex_t mutex_pq;
+pthread_cond_t cond_pq;
+priority_queue* pq;
+
+void submit_task(task_struct* task){
+    pthread_mutex_lock(&mutex_pq);
+
+    insert_pq(pq,task);
+
+    pthread_mutex_unlock(&mutex_pq);
+
+    // Signal that a task was inserted
+    pthread_cond_signal(&cond_pq);
+}
+
+
+void* startThread(void* args){
+
+    while(1){
+        task_struct* task;
+
+        pthread_mutex_lock(&mutex_pq);
+
+        while(pq->size == 0){
+            // Wait to receive a task
+            pthread_cond_wait(&cond_pq, &mutex_pq);
+        }
+
+        // Take the next task
+        task = top_pq(pq);
+        pop_pq(pq);
+
+        pthread_mutex_unlock(&mutex_pq);
+
+        //execute thread  here
+
+        //aici cred ca trebuie un switch cu toate comenzile
+    }
+
+}
+// ================= END =================
+
+// ================= DISK ANALYSIS =================
+struct returnValues {
+    // response_code = -1 if it failed, 0 if it succeeded
+    int response_code;
+    int numberOfFolders;
+    int numberOfFiles;
+    long size;
+};
+
+struct output {
+    char path[PATH_MAX];
+    struct returnValues data;
+};
+
+// TODO: how to estimate current progress
+struct task_info {
+    int suspend_index;
+    struct output returnOutput[PATH_MAX];
+    struct returnValues running_info;
+} taskInfo;
+
+int indexOutput = 0;
+
+void * folderAnalysis(const char* path) {
+    struct returnValues* ret = malloc(sizeof(2 * sizeof(int) + sizeof(long long)));
+    ret->numberOfFolders = 500;
+    ret->numberOfFiles = 100;
+    ret->size = 123021;
+    ret->response_code = 0;
+
+    return ret;
+}
+// ================= END =================
 
 int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 	openlog("Logs",LOG_PID,LOG_USER);
@@ -30,6 +110,7 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 	shm_unlink(DAEMON_INPUT_FILE);
 	//shared memory is accesible by all users
 	int shared_memory = shm_open(DAEMON_INPUT_FILE,O_CREAT | O_RDWR|O_EXCL , S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH | S_IRGRP | S_IWGRP);
+
 
 	
 	if(shared_memory < 0){
@@ -84,9 +165,6 @@ int main(){
 	
 	pthread_t thread_pool[THREAD_POOL_SIZE];
 
-	// Create the priority queue of tasks
-    priority_queue* pq;
-
     // Initiate pq
     if(initiate_pq(&pq) < 0){
 		perror(NULL);
@@ -100,6 +178,32 @@ int main(){
 	int status=open_and_initialize_shm(&communication_file);
 	if(status==EXIT_FAILURE) 
 		return EXIT_FAILURE;
+
+    // Initiate the mutex
+    if(pthread_mutex_init(&mutex_pq, NULL)) {
+        perror(NULL);
+        syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
+        closelog();
+        return EXIT_FAILURE;
+    }
+
+    // Initiate the cond
+    if(pthread_cond_init(&cond_pq,NULL)){
+        perror(NULL);
+        syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
+        closelog();
+        return EXIT_FAILURE;
+    }
+
+    // Create threads
+    for(int i = 0 ; i < THREAD_POOL_SIZE ; i++){
+        if(pthread_create(&thread_pool[i], NULL, &startThread, NULL) != 0){
+            perror(NULL);
+            syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
+            closelog();
+            return EXIT_FAILURE;
+        }
+    }
 	
 	while (1){
 		/*IPC with da.c shell*/
@@ -124,6 +228,23 @@ int main(){
 		sleep(1);
 		
 	}
-	
+
+    // TODO: join threads
+
+    // Join threads
+    for(int i = 0 ; i < THREAD_POOL_SIZE ; i++){
+        if(pthread_join(thread_pool[i], NULL) != 0){
+            perror(NULL);
+            syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
+            closelog();
+            return EXIT_FAILURE;
+        }
+    }
+
+
+    // Destroy the mutex and the condional
+    pthread_mutex_destroy(&mutex_pq);
+    pthread_cond_destroy(&cond_pq);
+
 	return 1;
 }
