@@ -11,6 +11,7 @@
 #define THREAD_POOL_SIZE 5
 #define FORMAT_LOG_ERROR "[ERROR] %d \n"
 
+
 pthread_mutex_t mutex_pq;
 pthread_cond_t cond_pq;
 priority_queue* pq;
@@ -24,6 +25,19 @@ void submit_task(task_struct* task){
 
     // Signal that a task was inserted
     pthread_cond_signal(&cond_pq);
+}
+
+
+
+void test(){
+    printf("cox\n");
+}
+/// ADI,IN LOC DE TEST ITI PUI FUNCTIA
+/// IN TASK AI: id,priority,deletede
+/// CRED CA ARGUMENTELE FUNCITIEI LE LUIA
+/// DIN CEVA HASH DUPA ID, nu sunt sigur
+void execute_task(task_struct* task){
+    test();
 }
 
 
@@ -45,9 +59,9 @@ void* startThread(void* args){
 
         pthread_mutex_unlock(&mutex_pq);
 
-        //execute thread  here
-        
-        //aici cred ca trebuie un switch cu toate comenzile 
+        // Acually do the task
+        execute_task(task);
+
     }
 
 }
@@ -89,7 +103,21 @@ int main(){
         }
     }
 
-    //submit tasks here
+// ************SUBMIT TASKS****************
+
+    /// ASTA O SA MEARGA IN WHILE TRUE DIN MAIN
+    /// DUPA CE SE CREEAZA TASKUL
+    for(int i = 0 ; i < 2 ; i++){
+
+        // CAND CREEZI UN TASK TREBUIE NEAPARAT CU MALLOC
+        task_struct* t = (task_struct*)malloc(sizeof(task_struct));
+        /// niste valori irelevante pt test
+        t->priority = i % 3 + 1;
+        t->task_id = i + 100;
+        t->deleted = 0;
+        submit_task(t);
+    }
+// *************************************
 
     // Join threads
     for(int i = 0 ; i < THREAD_POOL_SIZE ; i++){
@@ -105,6 +133,6 @@ int main(){
     pthread_mutex_destroy(&mutex_pq);
     pthread_cond_destroy(&cond_pq);
 
-    //free_pq(pq);
+    free_pq(pq);
     return 0;
 }
