@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <stdbool.h>
+#include <linux/limits.h>
+#include <unistd.h>
 
 struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded
@@ -20,18 +22,29 @@ struct output {
 };
 
 // TODO: how to estimate current progress
-struct task_info {
-    int suspend_index;
-    struct output returnOutput[PATH_MAX];
+typedef struct task_info {
+    struct output returnOutput[1000];
     struct returnValues running_info;
-} taskInfo;
+    int suspended;
+    
+} task_info;
+
+
+typedef struct task_info_and_path{
+    task_info * task;
+    char path[PATH_MAX]; 
+} task_info_and_path;
+
 
 int indexOutput = 0;
+void * folderAnalysis(void* arguments) {
+    task_info_and_path* get_union_taskInfo_path = arguments;
+    struct task_info * taskInfo = get_union_taskInfo_path->task; 
+    const char* path = get_union_taskInfo_path->path;
 
-void * folderAnalysis(const char* path) {
-    /*while(isSuspended) {
-        sleep(1);
-    }*/
+    while (taskInfo->suspended == true) {
+        sleep(0.2);
+    }
 
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
     ret->response_code = 0;
@@ -48,7 +61,7 @@ void * folderAnalysis(const char* path) {
     }
 
     int saveIndex = indexOutput;
-    strcpy(taskInfo.returnOutput[saveIndex].path, path);
+    strcpy(taskInfo->returnOutput[saveIndex].path, path);
 
     struct dirent* dp;
     struct stat sb;
@@ -68,26 +81,24 @@ void * folderAnalysis(const char* path) {
             if (stat(temp, &sb) == 0) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
-                    taskInfo.running_info.numberOfFolders ++;
+                    taskInfo->running_info.numberOfFolders ++;
                     indexOutput++;
-                    /*
-                        // ! adaugam atribut de isAnalyzed pentru a putea da resume
-                        if (isSuspended == false) {
-                            // continuam parcurgerea recursiva
-                            struct returnValues *ret_subdir = folderAnalysis(temp);
-                        } else {
-                            // salvam indexul la care suntem
-                            lastIndex = savedIndex;
-                            // lasam functia sa se termine natural (pentru a scrie tot ce a analizat in taskInfo.returnOutput
-                        }
-                    */
-                    struct returnValues *ret_subdir = folderAnalysis(temp);
+                    
+                    task_info_and_path* union_taskInfo_path=malloc(sizeof(task_info_and_path));
+                    union_taskInfo_path->task=get_union_taskInfo_path->task;
+                   
+                    
+                    strcpy(union_taskInfo_path->path, temp);
+                    
+                
+                    struct returnValues *ret_subdir = folderAnalysis(union_taskInfo_path);
+                    free(union_taskInfo_path);
 
                     if (ret_subdir->response_code == -1) {
                         ret->response_code = -1;
                         closedir(dir);
                         free(ret_subdir);
-                        taskInfo.returnOutput[saveIndex].data = *ret;
+                        taskInfo->returnOutput[saveIndex].data = *ret;
                         return ret;
                     }
 
@@ -97,8 +108,8 @@ void * folderAnalysis(const char* path) {
                     free(ret_subdir);
 
                 } else {
-                    taskInfo.running_info.size += sb.st_size;
-                    taskInfo.running_info.numberOfFiles++;
+                    taskInfo->running_info.size += sb.st_size;
+                    taskInfo->running_info.numberOfFiles++;
 
                     ret->size += sb.st_size;
                     ret->numberOfFiles++;
@@ -107,24 +118,24 @@ void * folderAnalysis(const char* path) {
                 perror("Failed to get file stats\n");
                 ret->response_code = -1;
                 closedir(dir);
-                taskInfo.returnOutput[saveIndex].data = *ret;
+                taskInfo->returnOutput[saveIndex].data = *ret;
                 return ret;
             }
         } else {
             if (errno == 0) {
                 closedir(dir);
-                taskInfo.returnOutput[saveIndex].data = *ret;
+                taskInfo->returnOutput[saveIndex].data = *ret;
                 return ret;
             }
 
             closedir(dir);
             ret->response_code = -1;
-            taskInfo.returnOutput[saveIndex].data = *ret;
+            taskInfo->returnOutput[saveIndex].data = *ret;
             return ret;
         }
     }
 
-    taskInfo.returnOutput[saveIndex].data = *ret;
+    taskInfo->returnOutput[saveIndex].data = *ret;
 
     closedir(dir);
     return ret;
@@ -160,21 +171,23 @@ void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
     }
 }
 
-int main(int argc, char* argv[]) {
-    for(int i=0; i<PATH_MAX; i++) {
-        taskInfo.returnOutput[i].data.response_code = 0;
-        taskInfo.returnOutput[i].data.size = 0;
-        taskInfo.returnOutput[i].data.numberOfFolders = 0;
-        taskInfo.returnOutput[i].data.numberOfFiles = 0;
+int main() {
+    task_info ts;
+    task_info_and_path spatiu;
+    spatiu.task=&ts;
+    
+    task_info_and_path* task = &spatiu;
+
+    for(int i=0; i<100; i++) {
+        task->task->returnOutput[i].data.response_code = 0;
+        task->task->returnOutput[i].data.size = 0;
+        task->task->returnOutput[i].data.numberOfFolders = 0;
+        task->task->returnOutput[i].data.numberOfFiles = 0;
     }
 
-    if (argc != 2) {
-        printf("Given number of arguments: %i, expected: 1\n", (argc-1));
-        return EXIT_FAILURE;
-    }
+    strcpy(task->path,"/home/skpha/Desktop/University-Work");
 
-    const char* path = argv[1];
-    struct returnValues *ret = folderAnalysis(path);
+    struct returnValues *ret = folderAnalysis(task);
 
     if (ret->response_code == -1) {
         perror("Failed to retrieve information about directory\n");
@@ -189,9 +202,9 @@ int main(int argc, char* argv[]) {
             printf("Number of folders: %i\n", ret->numberOfFolders);
             printf("%f MB\n", ret->size / 1e6);
         } else {
-            printf("%s/ %.2f%%\t%.1fMB\n|\n",taskInfo.returnOutput[0].path, 100.0f, taskInfo.returnOutput[0].data.size / 1e6);
-            int pathSizeOfParent = strlen(taskInfo.returnOutput[0].path);
-            analyzeOutput(taskInfo.returnOutput, pathSizeOfParent);
+            printf("%s/ %.2f%%\t%.1fMB\n|\n",task->task->returnOutput[0].path, 100.0f, task->task->returnOutput[0].data.size / 1e6);
+            int pathSizeOfParent = strlen(task->task->returnOutput[0].path);
+            analyzeOutput(task->task->returnOutput, pathSizeOfParent);
         }
     }
 

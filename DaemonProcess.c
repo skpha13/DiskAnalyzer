@@ -21,6 +21,10 @@
 
 int handle_prompt(daemon_file_t*  file){
     if (file->task_type == ADD_TASK) {
+        
+    }
+
+    if(file->task_type== REMOVE_TASK){
 
     }
     return -1;
