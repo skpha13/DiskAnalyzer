@@ -15,6 +15,7 @@ struct returnValues {
     int numberOfFolders;
     int numberOfFiles;
     long size;
+    float percentage;
 };
 
 struct output {
@@ -192,8 +193,8 @@ void * folderAnalysis(void* arguments) {
 
     taskInfo->returnOutput[saveIndex].data = *ret;
     if (taskInfo->returnOutput[saveIndex].data.numberOfFolders == 0)
-        totalPercentage += taskInfo->returnOutput[saveIndex].percentage;
-    printf("%.2f%%\n",totalPercentage);
+        taskInfo->running_info.percentage += taskInfo->returnOutput[saveIndex].percentage;
+    printf("%.2f%%\n",taskInfo->running_info.percentage);
 
     closedir(dir);
     return ret;
@@ -244,6 +245,7 @@ int main() {
         task->task->returnOutput[i].percentage = 0;
     }
     task->task->returnOutput[0].percentage = 100;
+    task->task->running_info.percentage = 0;
 
     strcpy(task->path,"/home/skpha/Desktop/University-Work");
 
