@@ -7,9 +7,10 @@
 #include <stdbool.h>
 #include <linux/limits.h>
 #include <unistd.h>
+#define MAX_NUMBER_OF_FOLDERS 50
 
 struct returnValues {
-    // response_code = -1 if it failed, 0 if it succeeded
+    // response_code = -1 if it failed, 0 if it succeeded, 1 if limit has reached
     int response_code;
     int numberOfFolders;
     int numberOfFiles;
@@ -23,7 +24,7 @@ struct output {
 
 // TODO: how to estimate current progress
 typedef struct task_info {
-    struct output returnOutput[1000];
+    struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
     struct returnValues running_info;
     int suspended;
     
@@ -42,15 +43,37 @@ void * folderAnalysis(void* arguments) {
     struct task_info * taskInfo = get_union_taskInfo_path->task; 
     const char* path = get_union_taskInfo_path->path;
 
-    while (taskInfo->suspended == true) {
-        sleep(0.2);
-    }
-
+    static bool limitReached = false;
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
+
     ret->response_code = 0;
     ret->numberOfFolders = 0;
     ret->size = 0;
     ret->numberOfFiles = 0;
+
+    if (limitReached == true) {
+        ret->response_code = 1;
+        return ret;
+    }
+
+    if (indexOutput >= MAX_NUMBER_OF_FOLDERS-2) {
+        taskInfo->returnOutput[indexOutput].data.size = 0;
+        taskInfo->returnOutput[indexOutput].data.response_code = 1;
+        taskInfo->returnOutput[indexOutput].data.numberOfFolders = 0;
+        taskInfo->returnOutput[indexOutput].data.numberOfFiles = 0;
+
+        char temp[strlen(path) + strlen(taskInfo->returnOutput[0].path) + 1];
+        strcpy(temp, taskInfo->returnOutput[0].path);
+        strcat(temp, "...");
+        strcpy(taskInfo->returnOutput[indexOutput].path,temp);
+
+        limitReached = true;
+        return ret;
+    }
+
+    while (taskInfo->suspended == true) {
+        sleep(0.2);
+    }
 
     DIR *dir = opendir(path);
 
@@ -70,7 +93,7 @@ void * folderAnalysis(void* arguments) {
         errno = 0;
 
         if (dp) {
-            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || dp->d_name[0] == '.')
                 continue;
 
             char temp[strlen(path) + strlen(dp->d_name) + 1];
@@ -100,6 +123,10 @@ void * folderAnalysis(void* arguments) {
                         free(ret_subdir);
                         taskInfo->returnOutput[saveIndex].data = *ret;
                         return ret;
+                    }
+
+                    if (ret_subdir->response_code == 1) {
+                        ret->numberOfFolders--;
                     }
 
                     ret->size += ret_subdir->size;
@@ -151,7 +178,7 @@ void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
 
     while (numberOfFolders) {
         int counter = 0;
-        for (; i<=indexOutput; i++) {
+        for (; i<MAX_NUMBER_OF_FOLDERS; i++) {
             printf("|-%s/ %.2f%%\t%.1fMB\n",
                    returnOutput[i].path + pathSizeOfParent,
                    calculatePercent(returnOutput[i].data.size, returnOutput[0].data.size),
@@ -178,7 +205,7 @@ int main() {
     
     task_info_and_path* task = &spatiu;
 
-    for(int i=0; i<100; i++) {
+    for(int i=0; i<MAX_NUMBER_OF_FOLDERS; i++) {
         task->task->returnOutput[i].data.response_code = 0;
         task->task->returnOutput[i].data.size = 0;
         task->task->returnOutput[i].data.numberOfFolders = 0;
