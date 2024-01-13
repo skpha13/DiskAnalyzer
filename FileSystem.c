@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <linux/limits.h>
 #include <unistd.h>
-#define MAX_NUMBER_OF_FOLDERS 50
+#define MAX_NUMBER_OF_FOLDERS 800
 
 struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded, 1 if limit has reached
@@ -20,9 +20,9 @@ struct returnValues {
 struct output {
     char path[PATH_MAX];
     struct returnValues data;
+    float percentage;
 };
 
-// TODO: how to estimate current progress
 typedef struct task_info {
     struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
     struct returnValues running_info;
@@ -44,6 +44,7 @@ void * folderAnalysis(void* arguments) {
     const char* path = get_union_taskInfo_path->path;
 
     static bool limitReached = false;
+    static float totalPercentage = 0;
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
 
     ret->response_code = 0;
@@ -73,6 +74,32 @@ void * folderAnalysis(void* arguments) {
 
     while (taskInfo->suspended == true) {
         sleep(0.2);
+    }
+
+    DIR *bfs_traversal = opendir(path);
+
+    if (bfs_traversal == NULL) {
+        perror("Failed to open directory\n");
+        ret->response_code = -1;
+        return ret;
+    }
+
+    int numberFolders = 0;
+    struct dirent* bfs;
+    struct stat st;
+    while ((bfs = readdir(bfs_traversal)) != NULL) {
+        if (bfs) {
+            if (strcmp(bfs->d_name, ".") == 0 || strcmp(bfs->d_name, "..") == 0 || bfs->d_name[0] == '.')
+                continue;
+
+            char temp[strlen(path) + strlen(bfs->d_name) + 1];
+            strcpy(temp, path);
+            strcat(temp, "/");
+            strcat(temp, bfs->d_name);
+            if (stat(temp, &st) == 0 && S_ISDIR(st.st_mode)) {
+                numberFolders++;
+            }
+        }
     }
 
     DIR *dir = opendir(path);
@@ -109,12 +136,13 @@ void * folderAnalysis(void* arguments) {
                     
                     task_info_and_path* union_taskInfo_path=malloc(sizeof(task_info_and_path));
                     union_taskInfo_path->task=get_union_taskInfo_path->task;
-                   
+                    if (indexOutput < MAX_NUMBER_OF_FOLDERS-2)
+                        union_taskInfo_path->task->returnOutput[indexOutput].percentage = taskInfo->returnOutput[saveIndex].percentage / numberFolders;
                     
                     strcpy(union_taskInfo_path->path, temp);
-                    
-                
+
                     struct returnValues *ret_subdir = folderAnalysis(union_taskInfo_path);
+
                     free(union_taskInfo_path);
 
                     if (ret_subdir->response_code == -1) {
@@ -163,6 +191,9 @@ void * folderAnalysis(void* arguments) {
     }
 
     taskInfo->returnOutput[saveIndex].data = *ret;
+    if (taskInfo->returnOutput[saveIndex].data.numberOfFolders == 0)
+        totalPercentage += taskInfo->returnOutput[saveIndex].percentage;
+    printf("%.2f%%\n",totalPercentage);
 
     closedir(dir);
     return ret;
@@ -210,7 +241,9 @@ int main() {
         task->task->returnOutput[i].data.size = 0;
         task->task->returnOutput[i].data.numberOfFolders = 0;
         task->task->returnOutput[i].data.numberOfFiles = 0;
+        task->task->returnOutput[i].percentage = 0;
     }
+    task->task->returnOutput[0].percentage = 100;
 
     strcpy(task->path,"/home/skpha/Desktop/University-Work");
 
