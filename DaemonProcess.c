@@ -13,24 +13,152 @@
 #include <stdio.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <linux/limits.h>
+
 
 #define FORMAT_LOG_ERROR "[ERROR] %d \n"
-#define THREAD_POOL_SIZE 5
-/*handle prompt sterge TOT dupa ce l-a citit, filozofia este ca dc am primit mezajul este doar pt mine*/
-/*de ex readPath(c) si dupa deletePath(c)*/
+#define MAX_NUMBER_OF_TASKS 500
+#define MAX_NUMBER_OF_FOLDERS 800
+
+typedef struct returnValues {
+    // response_code = -1 if it failed, 0 if it succeeded, 1 if limit has reached
+    int response_code;
+    int numberOfFolders;
+    int numberOfFiles;
+    long size;
+    float percentage;
+} returnValues;
+
+struct output {
+    char path[PATH_MAX];
+    struct returnValues data;
+    float percentage;
+};
+
+typedef struct task_info {
+    struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
+    struct returnValues running_info;
+    int suspended;
+    int is_done;//daca is_done =1 atunci done, daca =2 atunci a aparut o eroare
+    int running;// pentru a permte userului sa ii dea suspend cat timp vrea
+} task_info;
 
 
+typedef struct task_info_and_path{
+    task_info * task;
+    char path[PATH_MAX]; 
+} task_info_and_path;
 
-int add_task(daemon_file_t * file){
+
+typedef struct thread_arg{
+int thread_number;
+char * path_to_analize;
+} thread_arg;
+
+priority_queue* pq;
+
+char * thread_buffers[MAX_NUMBER_OF_TASKS];
+struct returnValues thread_responses[MAX_NUMBER_OF_TASKS];
+task_info_and_path task_infos[MAX_NUMBER_OF_TASKS];
+pthread_t task_threads[MAX_NUMBER_OF_TASKS];
+
+//functie de analiza la rezultatul unui thread, copiat din Filesystem.c
+void analyzeOutput(struct output returnOutput[], int pathSizeOfParent,char * buffer) {
+    int numberOfFolders = returnOutput[0].data.numberOfFolders;
+    int i = 1;
+
+    while (numberOfFolders) {
+        int counter = 0;
+        for (; i<MAX_NUMBER_OF_FOLDERS; i++) {
+            buffer+=sprintf(buffer,"|-%s/ %.2f%%\t%.1fMB\n",
+                   returnOutput[i].path + pathSizeOfParent,
+                   calculatePercent(returnOutput[i].data.size, returnOutput[0].data.size),
+                   returnOutput[i].data.size / 1e6);
+
+            counter += returnOutput[i].data.numberOfFolders;
+            if (counter < 1) {
+                i++;
+                break;
+            }
+
+            counter--;
+        }
+
+        if (numberOfFolders > 1) buffer+=sprintf(buffer,"|\n");
+        numberOfFolders--;
+    }
+}
+
+//copie aproape perfecta de la functia main in Filesystem.c
+void* thread_func(void* args){
+    thread_arg * arguments =args;
+    int index = arguments->thread_number;
+    
+    task_info_and_path* task = task_infos+index;
+    thread_buffers[index]=malloc(1e6); //do not free
+    for(int i=0; i<MAX_NUMBER_OF_FOLDERS; i++) {
+        task->task->returnOutput[i].data.response_code = 0;
+        task->task->returnOutput[i].data.size = 0;
+        task->task->returnOutput[i].data.numberOfFolders = 0;
+        task->task->returnOutput[i].data.numberOfFiles = 0;
+        task->task->returnOutput[i].percentage = 0;
+    }
+    task->task->returnOutput[0].percentage = 100;
+    task->task->running_info.percentage = 0;
+
+    strcpy(task->path,arguments->path_to_analize);
+    task->task->is_done=0;
+    task->task->running=1;
+    task->task->suspended=1;
+
+    struct returnValues *ret = folderAnalysis(task);
+    if (ret->response_code == -1) {
+        sprintf(thread_buffers[index],"Failed to get information about directory");
+        task->task->is_done=2;
+        return NULL;
+    }
+
+
+    thread_buffers[index]+=sprintf(thread_buffers[index],"%s/ %.2f%%\t%.1fMB\n|\n",task->task->returnOutput[0].path, 100.0f, task->task->returnOutput[0].data.size / 1e6);
+    int pathSizeOfParent = strlen(task->task->returnOutput[0].path);
+    analyzeOutput(task->task->returnOutput, pathSizeOfParent,thread_buffers[index]);
+    task->task->is_done=1;
+    return NULL;
 
 }
+bool isValidPath(const char* path) {
+    return opendir(path) !=NULL;
+}
+
+
+
+void add_task(daemon_file_t * file){
+    if(!isValidPath(file->path_to_analize)){
+        file->error=INVALID_PATH;
+        return;
+    }
+    int task_number=file->next_task_id;
+    file->next_task_id++;
+    thread_arg* args= malloc(sizeof(thread_arg));
+    args->path_to_analize= malloc(PATH_MAX+1);
+    strcpy(args->path_to_analize,file->path_to_analize);
+    args->thread_number=task_number;
+    pthread_create(task_threads[task_number],NULL,thread_func,args);
+
+}
+
 
 
 int remove_task(daemon_file_t * file){
 
 }
 
-int handle_prompt(daemon_file_t*  file){
+
+/*handle prompt sterge TOT dupa ce l-a citit, filozofia este ca dc am primit mezajul este doar pt mine*/
+/*de ex readPath(c) si dupa deletePath(c)*/
+void handle_prompt(daemon_file_t*  file){
     if (file->task_type == ADD_TASK) {
         
     }
@@ -82,40 +210,6 @@ void* startThread(void* args){
         //aici cred ca trebuie un switch cu toate comenzile
     }
 
-}
-// ================= END =================
-
-// ================= DISK ANALYSIS =================
-struct returnValues {
-    // response_code = -1 if it failed, 0 if it succeeded
-    int response_code;
-    int numberOfFolders;
-    int numberOfFiles;
-    long size;
-};
-
-struct output {
-    char path[PATH_MAX];
-    struct returnValues data;
-};
-
-// TODO: how to estimate current progress
-struct task_info {
-    int suspend_index;
-    struct output returnOutput[PATH_MAX];
-    struct returnValues running_info;
-} taskInfo;
-
-int indexOutput = 0;
-
-void * folderAnalysis(const char* path) {
-    struct returnValues* ret = malloc(sizeof(2 * sizeof(int) + sizeof(long long)));
-    ret->numberOfFolders = 500;
-    ret->numberOfFiles = 100;
-    ret->size = 123021;
-    ret->response_code = 0;
-
-    return ret;
 }
 // ================= END =================
 
@@ -178,7 +272,7 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 
 int main(){
 	
-	pthread_t thread_pool[THREAD_POOL_SIZE];
+	
 
     // Initiate pq
     if(initiate_pq(&pq) < 0){

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "task_symbols.h": "c",
+        "string.h": "c"
+    }
+}

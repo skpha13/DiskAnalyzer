@@ -9,14 +9,14 @@
 #include <unistd.h>
 #define MAX_NUMBER_OF_FOLDERS 800
 
-struct returnValues {
+typedef struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded, 1 if limit has reached
     int response_code;
     int numberOfFolders;
     int numberOfFiles;
     long size;
     float percentage;
-};
+} returnValues;
 
 struct output {
     char path[PATH_MAX];
@@ -28,7 +28,8 @@ typedef struct task_info {
     struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
     struct returnValues running_info;
     int suspended;
-    
+    int is_done;//daca is_done =1 atunci done, daca =2 atunci a aparut o eroare
+    int running;// pentru a permte userului sa ii dea suspend cat timp vrea
 } task_info;
 
 
@@ -39,14 +40,19 @@ typedef struct task_info_and_path{
 
 
 
-void * folderAnalysis(void* arguments) {
+struct returnValues * folderAnalysis(task_info_and_path* arguments) {
     task_info_and_path* get_union_taskInfo_path = arguments;
     struct task_info * taskInfo = get_union_taskInfo_path->task; 
     const char* path = get_union_taskInfo_path->path;
     static int indexOutput=0;
     static bool limitReached = false;
     static float totalPercentage = 0;
-    struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));
+    struct returnValues *ret = malloc(sizeof(returnValues));
+
+    while (taskInfo->suspended == true) {
+        sleep(0.2);
+    }
+
 
     ret->response_code = 0;
     ret->numberOfFolders = 0;
@@ -73,9 +79,7 @@ void * folderAnalysis(void* arguments) {
         return ret;
     }
 
-    while (taskInfo->suspended == true) {
-        sleep(0.2);
-    }
+    
 
     DIR *bfs_traversal = opendir(path);
 
@@ -194,7 +198,7 @@ void * folderAnalysis(void* arguments) {
     taskInfo->returnOutput[saveIndex].data = *ret;
     if (taskInfo->returnOutput[saveIndex].data.numberOfFolders == 0)
         taskInfo->running_info.percentage += taskInfo->returnOutput[saveIndex].percentage;
-    printf("%.2f%%\n",taskInfo->running_info.percentage);
+    //printf("%.2f%%\n",taskInfo->running_info.percentage);
 
     closedir(dir);
     return ret;
@@ -204,14 +208,14 @@ float calculatePercent(long size, long fullSize) {
     return (size * 100) / fullSize;
 }
 
-void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
+void analyzeOutput(struct output returnOutput[], int pathSizeOfParent,char * buffer) {
     int numberOfFolders = returnOutput[0].data.numberOfFolders;
     int i = 1;
 
     while (numberOfFolders) {
         int counter = 0;
         for (; i<MAX_NUMBER_OF_FOLDERS; i++) {
-            printf("|-%s/ %.2f%%\t%.1fMB\n",
+            buffer+=sprintf(buffer,"|-%s/ %.2f%%\t%.1fMB\n",
                    returnOutput[i].path + pathSizeOfParent,
                    calculatePercent(returnOutput[i].data.size, returnOutput[0].data.size),
                    returnOutput[i].data.size / 1e6);
@@ -225,12 +229,13 @@ void analyzeOutput(struct output returnOutput[], int pathSizeOfParent) {
             counter--;
         }
 
-        if (numberOfFolders > 1) printf("|\n");
+        if (numberOfFolders > 1) buffer+=sprintf(buffer,"|\n");
         numberOfFolders--;
     }
 }
-
+char buffer[1000000];
 int main() {
+    
     task_info ts;
     task_info_and_path spatiu;
     spatiu.task=&ts;
@@ -247,7 +252,7 @@ int main() {
     task->task->returnOutput[0].percentage = 100;
     task->task->running_info.percentage = 0;
 
-    strcpy(task->path,"/home/skpha/Desktop/University-Work");
+    strcpy(task->path,"/home/liviu/Programing");
 
     struct returnValues *ret = folderAnalysis(task);
 
@@ -266,10 +271,10 @@ int main() {
         } else {
             printf("%s/ %.2f%%\t%.1fMB\n|\n",task->task->returnOutput[0].path, 100.0f, task->task->returnOutput[0].data.size / 1e6);
             int pathSizeOfParent = strlen(task->task->returnOutput[0].path);
-            analyzeOutput(task->task->returnOutput, pathSizeOfParent);
+            analyzeOutput(task->task->returnOutput, pathSizeOfParent,buffer);
         }
     }
-
+    puts(buffer);
     if (ret != NULL)
         free(ret);
 
