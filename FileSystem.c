@@ -38,12 +38,12 @@ typedef struct task_info_and_path{
 } task_info_and_path;
 
 
-int indexOutput = 0;
+
 void * folderAnalysis(void* arguments) {
     task_info_and_path* get_union_taskInfo_path = arguments;
     struct task_info * taskInfo = get_union_taskInfo_path->task; 
     const char* path = get_union_taskInfo_path->path;
-
+    static int indexOutput=0;
     static bool limitReached = false;
     static float totalPercentage = 0;
     struct returnValues *ret = malloc(2 * sizeof(int) + sizeof(long long));

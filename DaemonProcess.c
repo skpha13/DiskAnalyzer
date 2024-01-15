@@ -19,6 +19,17 @@
 /*handle prompt sterge TOT dupa ce l-a citit, filozofia este ca dc am primit mezajul este doar pt mine*/
 /*de ex readPath(c) si dupa deletePath(c)*/
 
+
+
+int add_task(daemon_file_t * file){
+
+}
+
+
+int remove_task(daemon_file_t * file){
+
+}
+
 int handle_prompt(daemon_file_t*  file){
     if (file->task_type == ADD_TASK) {
         
