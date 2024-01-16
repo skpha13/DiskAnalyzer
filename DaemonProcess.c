@@ -41,6 +41,7 @@ typedef struct task_info {
     struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
     struct returnValues running_info;
     int priority;
+    int deleted;
     int suspended;
     int is_done;//daca is_done =1 atunci done, daca =2 atunci a aparut o eroare
     int running;// pentru a permte userului sa ii dea suspend cat timp vrea
@@ -56,6 +57,7 @@ typedef struct task_info_and_path{
 typedef struct thread_arg{
 int thread_number;
 char * path_to_analize;
+int priority;
 } thread_arg;
 
 
@@ -103,7 +105,8 @@ void* thread_func(void* args){
     int index = arguments->thread_number;
     
     task_info_and_path* task = task_infos+index;
-    thread_buffers[index]=malloc(1e6); //do not free
+    task->task=malloc(sizeof(task_info));
+    thread_buffers[index]=malloc(1e7);
     for(int i=0; i<MAX_NUMBER_OF_FOLDERS; i++) {
         task->task->returnOutput[i].data.response_code = 0;
         task->task->returnOutput[i].data.size = 0;
@@ -118,7 +121,8 @@ void* thread_func(void* args){
     task->task->is_done=0;
     task->task->running=1;
     task->task->suspended=1;
-
+    task->task->priority=arguments->priority;
+    task->task->deleted=0;
     struct returnValues *ret = folderAnalysis(task);
     if (ret->response_code == -1) {
         sprintf(thread_buffers[index],"Failed to get information about directory");
@@ -145,32 +149,144 @@ void add_task(daemon_file_t * file){
         file->error=INVALID_PATH;
         return;
     }
+    if(file->next_task_id==MAX_NUMBER_OF_TASKS){
+        file->error=TOO_MANY_TASKS;
+        return;
+    }
     int task_number=file->next_task_id;
     file->next_task_id++;
     thread_arg* args= malloc(sizeof(thread_arg));
     args->path_to_analize= malloc(PATH_MAX+1);
     strcpy(args->path_to_analize,file->path_to_analize);
+    file->path_to_analize[0]=0;
     args->thread_number=task_number;
+    args->priority=file->priority;
     pthread_create(task_threads+task_number,NULL,thread_func,args);
 
 }
 
 
 
-int remove_task(daemon_file_t * file){
+void remove_task(daemon_file_t * file){
+    int task_num=file->task_id;
+    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+        file->error=TASK_UNFOUND;
+        return;
+    }
+
+    pthread_cancel(task_threads[task_num]);
+    free(thread_buffers[task_num]);
+    free(task_infos[task_num].task);
+    thread_buffers[task_num]=NULL;
+    suspend_task(pq,task_num);
+    task_infos[task_num].task->is_done=1;
+    task_infos[task_num].task->deleted=1;
 
 }
 
+void suspend_task_daemon(daemon_file_t * file){
+    int task_num=file->task_id;
+    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+        file->error=TASK_UNFOUND;
+        return;
+    }
+    suspend_task(pq,task_num);
+    task_infos[task_num].task->running=0;
+    task_infos[task_num].task->suspended=1;
+    
+
+}
+
+void resume_task(daemon_file_t * file){
+    int task_num=file->task_id;
+    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+        file->error=TASK_UNFOUND;
+        return;
+    }
+    if(task_infos[task_num].task->running==0&&!task_infos[task_num].task->is_done){
+        task_infos[task_num].task->running=1;
+        task_struct * t =malloc(sizeof(task_struct));
+        t->deleted=0;
+        t->task_id=task_num;
+        t->priority=task_infos[task_num].task->priority;
+        insert_pq(pq,t);
+    }
+}
+
+
+void prompt_task_info(daemon_file_t * file){
+    int task_num=file->task_id;
+    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+        file->error=TASK_UNFOUND;
+        return;
+    }
+    if(task_infos[task_num].task->is_done==0){
+        sprintf(file->path_to_analize,"In Progress,%.2f%% done\n",task_infos[task_num].task->running_info.percentage);
+    }
+    else{
+        sprintf(file->path_to_analize,"Done\n");
+    }
+}
+
+
+void prompt_report(daemon_file_t * file){
+   int task_num=file->task_id;
+    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+        file->error=TASK_UNFOUND;
+        return;
+    }
+    if(task_infos[task_num].task->is_done==0){
+        file->error=TASK_NOT_DONE;
+        return;
+    } 
+    sprintf(file->path_to_analize,thread_buffers[task_num]);
+}
+
+void list_tasks(daemon_file_t * file){
+    char * c =file->path_to_analize;
+    c+=sprintf(c,"ID PRI Path Done Status Details\n");
+    for(int i=0;i<file->next_task_id;i++){
+        if(!task_infos[i].task->deleted){
+            char * status;
+            if(task_infos[i].task->is_done){
+                status="Finished";
+            }
+            else{
+                status="Pending";
+            }
+            c+=sprintf(c,"%d %d %s %.2f%% Done %s %d files %d folders\n",i,
+            
+            task_infos[i].task->priority,task_infos[i].path,c,task_infos[i].task->running_info.numberOfFiles,
+            
+            task_infos[i].task->running_info.numberOfFolders);
+        }
+    }
+}
 
 /*handle prompt sterge TOT dupa ce l-a citit, filozofia este ca dc am primit mezajul este doar pt mine*/
 /*de ex readPath(c) si dupa deletePath(c)*/
 void handle_prompt(daemon_file_t*  file){
     if (file->task_type == ADD_TASK) {
-        
+        add_task(file);
     }
 
     if(file->task_type== REMOVE_TASK){
-
+        remove_task(file);
+    }
+    if(file->task_type==SUSPEND_TASK){
+        suspend_task_daemon(file);
+    }
+    if(file->task_type==RESUME_TASK){
+        resume_task(file);
+    }
+    if(file->task_type==PROMPT_TASK_INFO){
+        prompt_task_info(file);
+    }
+    if(file->task_type==PROMPT_REPORT){
+        prompt_report(file);
+    }
+    if(file->task_type==LIST_TASKS){
+        list_tasks(file);
     }
     
 }
@@ -291,9 +407,10 @@ int main(){
 	// opening shared memory and initialize 
 	daemon_file_t *communication_file;
 	int status=open_and_initialize_shm(&communication_file);
-	if(status==EXIT_FAILURE) 
+	if(status==EXIT_FAILURE){
 		return EXIT_FAILURE;
 
+    }
 	
 	while (1){
 		/*IPC with da.c shell*/
@@ -311,7 +428,7 @@ int main(){
 				closelog();
 			}
 			
-			fflush(0);
+			
 		}
 		pthread_mutex_unlock(&communication_file->acces_file);
 
