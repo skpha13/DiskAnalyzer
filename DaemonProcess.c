@@ -101,7 +101,7 @@ void* thread_func(void* args){
     
     task_info_and_path* task = task_infos+index;
     task->task=malloc(sizeof(task_info));
-    thread_buffers[index]=malloc(1e6);
+    thread_buffers[index]=malloc(1e7);
     for(int i=0; i<MAX_NUMBER_OF_FOLDERS; i++) {
         task->task->returnOutput[i].data.response_code = 0;
         task->task->returnOutput[i].data.size = 0;
