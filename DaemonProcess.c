@@ -40,6 +40,7 @@ struct output {
 typedef struct task_info {
     struct output returnOutput[MAX_NUMBER_OF_FOLDERS];
     struct returnValues running_info;
+    int priority;
     int suspended;
     int is_done;//daca is_done =1 atunci done, daca =2 atunci a aparut o eroare
     int running;// pentru a permte userului sa ii dea suspend cat timp vrea
@@ -271,8 +272,8 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 }
 
 int main(){
-	
-	
+	task_struct* task_running = malloc(sizeof(task_struct));	
+    task_running->task_id = -1;
 
     // Initiate pq
     if(initiate_pq(&pq) < 0){
@@ -288,31 +289,6 @@ int main(){
 	if(status==EXIT_FAILURE) 
 		return EXIT_FAILURE;
 
-    // Initiate the mutex
-    if(pthread_mutex_init(&mutex_pq, NULL)) {
-        perror(NULL);
-        syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
-        closelog();
-        return EXIT_FAILURE;
-    }
-
-    // Initiate the cond
-    if(pthread_cond_init(&cond_pq,NULL)){
-        perror(NULL);
-        syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
-        closelog();
-        return EXIT_FAILURE;
-    }
-
-    // Create threads
-    for(int i = 0 ; i < THREAD_POOL_SIZE ; i++){
-        if(pthread_create(&thread_pool[i], NULL, &startThread, NULL) != 0){
-            perror(NULL);
-            syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
-            closelog();
-            return EXIT_FAILURE;
-        }
-    }
 	
 	while (1){
 		/*IPC with da.c shell*/
@@ -334,26 +310,47 @@ int main(){
 		}
 		pthread_mutex_unlock(&communication_file->acces_file);
 
+        task_struct* pq_task = top_pq(pq);
+        while (pq_task != NULL) {
+            int task_id = pq_task->task_id;
+            int task_priority = pq_task->priority;
+            bool isDeleted = (pq_task->deleted == 1);
+
+            if (task_infos[task_id].task->suspended == 1 ||
+                task_infos[task_id].task->is_done == 1 ||
+                isDeleted)
+            {
+                pop_pq(pq);
+                pq_task = top_pq(pq);
+                
+                continue;
+            }
+
+            if (task_running->task_id == -1 ||
+                task_infos[task_running->task_id].task->is_done == 1) 
+            {
+                task_running = pq_task;
+                task_infos[task_id].task->running = 1;
+
+                break;
+            }
+
+            if (task_priority > task_running->priority && task_infos[task_id].task->running == 0) 
+            {
+                swap(task_running, pq_task);
+                task_infos[task_id].task->running = 1;
+
+                break;
+            }
+
+            pop_pq(pq);
+            pq_task = top_pq(pq);
+        }
+
 		sleep(1);
 		
 	}
 
-    // TODO: join threads
-
-    // Join threads
-    for(int i = 0 ; i < THREAD_POOL_SIZE ; i++){
-        if(pthread_join(thread_pool[i], NULL) != 0){
-            perror(NULL);
-            syslog(LOG_INFO, FORMAT_LOG_ERROR, errno);
-            closelog();
-            return EXIT_FAILURE;
-        }
-    }
-
-
-    // Destroy the mutex and the condional
-    pthread_mutex_destroy(&mutex_pq);
-    pthread_cond_destroy(&cond_pq);
-
+    
 	return 1;
 }

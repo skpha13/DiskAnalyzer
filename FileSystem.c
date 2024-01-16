@@ -280,5 +280,3 @@ int main() {
 
     return EXIT_SUCCESS;
 }
-
-// TODO: percent doesnt add up, because of rounding
