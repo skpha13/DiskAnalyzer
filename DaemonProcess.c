@@ -311,36 +311,22 @@ int main(){
 		pthread_mutex_unlock(&communication_file->acces_file);
 
         task_struct* pq_task = top_pq(pq);
-        while (pq_task != NULL) {
+        if (pq_task != NULL) {
             int task_id = pq_task->task_id;
             int task_priority = pq_task->priority;
-            bool isDeleted = (pq_task->deleted == 1);
-
-            if (task_infos[task_id].task->suspended == 1 ||
-                task_infos[task_id].task->is_done == 1 ||
-                isDeleted)
-            {
-                pop_pq(pq);
-                pq_task = top_pq(pq);
-                
-                continue;
-            }
 
             if (task_running->task_id == -1 ||
                 task_infos[task_running->task_id].task->is_done == 1) 
             {
                 task_running = pq_task;
-                task_infos[task_id].task->running = 1;
-
-                break;
+                task_infos[task_id].task->suspended = 0;
             }
 
-            if (task_priority > task_running->priority && task_infos[task_id].task->running == 0) 
+            if (task_priority > task_running->priority && task_infos[task_id].task->suspended == 0) 
             {
-                swap(task_running, pq_task);
-                task_infos[task_id].task->running = 1;
-
-                break;
+                task_infos[task_running->task_id].task->suspended = 1;
+                task_infos[task_id].task->suspended = 0;
+                swap_task(task_running, pq_task);
             }
 
             pop_pq(pq);
@@ -348,9 +334,7 @@ int main(){
         }
 
 		sleep(1);
-		
 	}
 
-    
 	return 1;
 }
