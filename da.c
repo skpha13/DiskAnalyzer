@@ -98,7 +98,6 @@ void add_task(const char* path,int priority,daemon_file_t* daemon_input){
     daemon_input->task_type=ADD_TASK;
     strcpy(daemon_input->path_to_analize,path);
     daemon_input->priority=priority;
-    daemon_input->next_task_id++;
     pthread_mutex_unlock(&daemon_input->acces_file);// I let the daemon have acces to the file
     
     sem_wait(&daemon_input->shell_continue);// I wait for the daemon to finish in order to continue
@@ -112,7 +111,7 @@ void add_task(const char* path,int priority,daemon_file_t* daemon_input){
     
     }
     else{
-        printf("Added task wit id %d\n",daemon_input->next_task_id-1);
+        printf("Added task with id %d\n",daemon_input->next_task_id-1);
     }
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }
@@ -130,7 +129,7 @@ void suspend_task(int id,daemon_file_t* daemon_input){
         daemon_input->error=0;
     }
     else{
-        printf("Suspended task with id %d",id);
+        printf("Suspended task with id %d\n",id);
     }
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }
@@ -166,7 +165,7 @@ void remove_task(int id,daemon_file_t* daemon_input){
         printf("[error] Task with job id %d does not exist to analyze\n",id);
     }
     else{
-        printf("Removed task with id %d=\n",id);
+        printf("Removed task with id %d\n",id);
     }
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }
@@ -195,11 +194,15 @@ void info_task(int id,daemon_file_t* daemon_input){
 void list_tasks(daemon_file_t* daemon_input){
     pthread_mutex_lock(&daemon_input->shell_wait);
     pthread_mutex_lock(&daemon_input->acces_file);
+
     daemon_input->task_type=LIST_TASKS;
+
     pthread_mutex_unlock(&daemon_input->acces_file);
     sem_wait(&daemon_input->shell_continue);
     puts(daemon_input->path_to_analize);
+
     daemon_input->path_to_analize[0]=0;
+    
     pthread_mutex_unlock(&daemon_input->shell_wait);
 }
 

@@ -45,6 +45,10 @@ typedef struct task_info {
     int suspended;
     int is_done;//daca is_done =1 atunci done, daca =2 atunci a aparut o eroare
     int running;// pentru a permte userului sa ii dea suspend cat timp vrea
+    int indexOutput;
+    bool limitReached;
+    float totalPercentage;
+
 } task_info;
 
 
@@ -74,6 +78,7 @@ pthread_t task_threads[MAX_NUMBER_OF_TASKS];
 
 //functie de analiza la rezultatul unui thread, copiat din Filesystem.c
 void analyzeOutput(struct output returnOutput[], int pathSizeOfParent,char * buffer) {
+    buffer+=sprintf(buffer,"%s/ %.2f%%\t%.1fMB\n|\n",returnOutput[0].path, 100.0f, returnOutput[0].data.size / 1e6);
     int numberOfFolders = returnOutput[0].data.numberOfFolders;
     int i = 1;
 
@@ -105,8 +110,7 @@ void* thread_func(void* args){
     int index = arguments->thread_number;
     
     task_info_and_path* task = task_infos+index;
-    task->task=malloc(sizeof(task_info));
-    thread_buffers[index]=malloc(1e7);
+    
     for(int i=0; i<MAX_NUMBER_OF_FOLDERS; i++) {
         task->task->returnOutput[i].data.response_code = 0;
         task->task->returnOutput[i].data.size = 0;
@@ -115,14 +119,15 @@ void* thread_func(void* args){
         task->task->returnOutput[i].percentage = 0;
     }
     task->task->returnOutput[0].percentage = 100;
-    task->task->running_info.percentage = 0;
+    //task->task->running_info.percentage = 0;
 
-    strcpy(task->path,arguments->path_to_analize);
-    task->task->is_done=0;
-    task->task->running=1;
-    task->task->suspended=1;
-    task->task->priority=arguments->priority;
-    task->task->deleted=0;
+    // strcpy(task->path,arguments->path_to_analize);
+    // task->task->is_done=0;
+    // task->task->running=1;
+    // task->task->suspended=1;
+    // task->task->priority=arguments->priority;
+    // task->task->deleted=0;
+    
     struct returnValues *ret = folderAnalysis(task);
     if (ret->response_code == -1) {
         sprintf(thread_buffers[index],"Failed to get information about directory");
@@ -131,7 +136,7 @@ void* thread_func(void* args){
     }
 
 
-    thread_buffers[index]+=sprintf(thread_buffers[index],"%s/ %.2f%%\t%.1fMB\n|\n",task->task->returnOutput[0].path, 100.0f, task->task->returnOutput[0].data.size / 1e6);
+    //sprintf(thread_buffers[index],"%s/ %.2f%%\t%.1fMB\n|\n",task->task->returnOutput[0].path, 100.0f, task->task->returnOutput[0].data.size / 1e6);
     int pathSizeOfParent = strlen(task->task->returnOutput[0].path);
     analyzeOutput(task->task->returnOutput, pathSizeOfParent,thread_buffers[index]);
     task->task->is_done=1;
@@ -153,15 +158,50 @@ void add_task(daemon_file_t * file){
         file->error=TOO_MANY_TASKS;
         return;
     }
+    //task->task->running_info.percentage = 0;
+    // strcpy(task->path,arguments->path_to_analize);
+    // task->task->is_done=0;
+    // task->task->running=1;
+    // task->task->suspended=1;
+    // task->task->priority=arguments->priority;
+    // task->task->deleted=0;
     int task_number=file->next_task_id;
     file->next_task_id++;
+    //create the thread and init the contents of its context block
+    
     thread_arg* args= malloc(sizeof(thread_arg));
+    thread_buffers[task_number]=malloc(1e7);
+    task_infos[task_number].task=malloc(sizeof(task_info));
     args->path_to_analize= malloc(PATH_MAX+1);
     strcpy(args->path_to_analize,file->path_to_analize);
-    file->path_to_analize[0]=0;
+    
     args->thread_number=task_number;
     args->priority=file->priority;
+    
+    task_infos[task_number].task->running_info.percentage=0;
+    task_infos[task_number].task->running_info.numberOfFolders=0;
+    task_infos[task_number].task->running_info.numberOfFiles=0;
+    
+    strcpy(task_infos[task_number].path,file->path_to_analize);
+    file->path_to_analize[0]=0;
+    task_infos[task_number].task->is_done=0;
+    task_infos[task_number].task->running=1;
+    task_infos[task_number].task->suspended=1;
+    task_infos[task_number].task->priority=file->priority;
+    task_infos[task_number].task->deleted=0;
+    task_infos[task_number].task->limitReached=false;
+    task_infos[task_number].task->indexOutput=0;
+    task_infos[task_number].task->totalPercentage=0.f;
     pthread_create(task_threads+task_number,NULL,thread_func,args);
+    task_struct * val_thread_in_queue=malloc(sizeof(task_struct));
+    
+    //insert in queue
+    val_thread_in_queue->task_id=task_number;
+    val_thread_in_queue->deleted=0;
+    val_thread_in_queue->priority=file->priority;
+    insert_pq(pq,val_thread_in_queue);
+
+    
 
 }
 
@@ -169,14 +209,14 @@ void add_task(daemon_file_t * file){
 
 void remove_task(daemon_file_t * file){
     int task_num=file->task_id;
-    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+    if(file->next_task_id<=task_num||task_infos[task_num].task->deleted){
         file->error=TASK_UNFOUND;
         return;
     }
 
     pthread_cancel(task_threads[task_num]);
     free(thread_buffers[task_num]);
-    free(task_infos[task_num].task);
+    
     thread_buffers[task_num]=NULL;
     suspend_task(pq,task_num);
     task_infos[task_num].task->is_done=1;
@@ -186,7 +226,7 @@ void remove_task(daemon_file_t * file){
 
 void suspend_task_daemon(daemon_file_t * file){
     int task_num=file->task_id;
-    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+    if(file->next_task_id<=task_num||task_infos[task_num].task->deleted){
         file->error=TASK_UNFOUND;
         return;
     }
@@ -199,7 +239,7 @@ void suspend_task_daemon(daemon_file_t * file){
 
 void resume_task(daemon_file_t * file){
     int task_num=file->task_id;
-    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+    if(file->next_task_id<=task_num||task_infos[task_num].task->deleted){
         file->error=TASK_UNFOUND;
         return;
     }
@@ -216,7 +256,7 @@ void resume_task(daemon_file_t * file){
 
 void prompt_task_info(daemon_file_t * file){
     int task_num=file->task_id;
-    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+    if(file->next_task_id<=task_num||task_infos[task_num].task->deleted){
         file->error=TASK_UNFOUND;
         return;
     }
@@ -231,7 +271,7 @@ void prompt_task_info(daemon_file_t * file){
 
 void prompt_report(daemon_file_t * file){
    int task_num=file->task_id;
-    if(file->next_task_id>=task_num||task_infos[task_num].task->deleted){
+    if(file->next_task_id<=task_num||task_infos[task_num].task->deleted){
         file->error=TASK_UNFOUND;
         return;
     }
@@ -239,7 +279,7 @@ void prompt_report(daemon_file_t * file){
         file->error=TASK_NOT_DONE;
         return;
     } 
-    sprintf(file->path_to_analize,thread_buffers[task_num]);
+    sprintf(file->path_to_analize,"%s",thread_buffers[task_num]);
 }
 
 void list_tasks(daemon_file_t * file){
@@ -254,11 +294,13 @@ void list_tasks(daemon_file_t * file){
             else{
                 status="Pending";
             }
-            c+=sprintf(c,"%d %d %s %.2f%% Done %s %d files %d folders\n",i,
-            
-            task_infos[i].task->priority,task_infos[i].path,c,task_infos[i].task->running_info.numberOfFiles,
-            
-            task_infos[i].task->running_info.numberOfFolders);
+            c+=sprintf(c,"%d %d %s %.2f%% Done %s %d files %d folders\n",
+                        i,  
+                        task_infos[i].task->priority,
+                        task_infos[i].path,task_infos[i].task->running_info.percentage,
+                        status,
+                        task_infos[i].task->running_info.numberOfFiles,
+                        task_infos[i].task->running_info.numberOfFolders);
         }
     }
 }
@@ -433,6 +475,11 @@ int main(){
 		pthread_mutex_unlock(&communication_file->acces_file);
 
         task_struct* pq_task = top_pq(pq);
+        
+        if (task_running->task_id!=-1&&task_infos[task_running->task_id].task->running == 0){
+            task_running->task_id = -1;
+        }
+         
         if (pq_task != NULL) {
             int task_id = pq_task->task_id;
             int task_priority = pq_task->priority;
@@ -465,12 +512,13 @@ int main(){
 }
 
 struct returnValues * folderAnalysis(task_info_and_path* arguments) {
+    sleep(1);
     task_info_and_path* get_union_taskInfo_path = arguments;
     struct task_info * taskInfo = get_union_taskInfo_path->task; 
     const char* path = get_union_taskInfo_path->path;
-    static int indexOutput=0;
-    static bool limitReached = false;
-    static float totalPercentage = 0;
+    // static int indexOutput=0;
+    // static bool limitReached = false;
+    // static float totalPercentage = 0;
     struct returnValues *ret = malloc(sizeof(returnValues));
 
     while (taskInfo->suspended == true) {
@@ -483,23 +531,23 @@ struct returnValues * folderAnalysis(task_info_and_path* arguments) {
     ret->size = 0;
     ret->numberOfFiles = 0;
 
-    if (limitReached == true) {
+    if (taskInfo->limitReached == true) {
         ret->response_code = 1;
         return ret;
     }
 
-    if (indexOutput >= MAX_NUMBER_OF_FOLDERS-2) {
-        taskInfo->returnOutput[indexOutput].data.size = 0;
-        taskInfo->returnOutput[indexOutput].data.response_code = 1;
-        taskInfo->returnOutput[indexOutput].data.numberOfFolders = 0;
-        taskInfo->returnOutput[indexOutput].data.numberOfFiles = 0;
+    if (taskInfo->indexOutput >= MAX_NUMBER_OF_FOLDERS-2) {
+        taskInfo->returnOutput[taskInfo->indexOutput].data.size = 0;
+        taskInfo->returnOutput[taskInfo->indexOutput].data.response_code = 1;
+        taskInfo->returnOutput[taskInfo->indexOutput].data.numberOfFolders = 0;
+        taskInfo->returnOutput[taskInfo->indexOutput].data.numberOfFiles = 0;
 
         char temp[strlen(path) + strlen(taskInfo->returnOutput[0].path) + 1];
         strcpy(temp, taskInfo->returnOutput[0].path);
         strcat(temp, "...");
-        strcpy(taskInfo->returnOutput[indexOutput].path,temp);
+        strcpy(taskInfo->returnOutput[taskInfo->indexOutput].path,temp);
 
-        limitReached = true;
+        taskInfo->limitReached = true;
         return ret;
     }
 
@@ -539,7 +587,7 @@ struct returnValues * folderAnalysis(task_info_and_path* arguments) {
         return ret;
     }
 
-    int saveIndex = indexOutput;
+    int saveIndex = taskInfo->indexOutput;
     strcpy(taskInfo->returnOutput[saveIndex].path, path);
 
     struct dirent* dp;
@@ -561,12 +609,12 @@ struct returnValues * folderAnalysis(task_info_and_path* arguments) {
                 if (S_ISDIR(sb.st_mode)) {
                     ret->numberOfFolders++;
                     taskInfo->running_info.numberOfFolders ++;
-                    indexOutput++;
+                    taskInfo->indexOutput++;
                     
                     task_info_and_path* union_taskInfo_path=malloc(sizeof(task_info_and_path));
                     union_taskInfo_path->task=get_union_taskInfo_path->task;
-                    if (indexOutput < MAX_NUMBER_OF_FOLDERS-2)
-                        union_taskInfo_path->task->returnOutput[indexOutput].percentage = taskInfo->returnOutput[saveIndex].percentage / numberFolders;
+                    if (taskInfo->indexOutput < MAX_NUMBER_OF_FOLDERS-2)
+                        union_taskInfo_path->task->returnOutput[taskInfo->indexOutput].percentage = taskInfo->returnOutput[saveIndex].percentage / numberFolders;
                     
                     strcpy(union_taskInfo_path->path, temp);
 
