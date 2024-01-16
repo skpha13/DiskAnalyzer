@@ -58,6 +58,11 @@ int thread_number;
 char * path_to_analize;
 } thread_arg;
 
+
+float calculatePercent(long size, long fullSize);
+struct returnValues * folderAnalysis(task_info_and_path* arguments);
+
+
 priority_queue* pq;
 
 char * thread_buffers[MAX_NUMBER_OF_TASKS];
@@ -146,7 +151,7 @@ void add_task(daemon_file_t * file){
     args->path_to_analize= malloc(PATH_MAX+1);
     strcpy(args->path_to_analize,file->path_to_analize);
     args->thread_number=task_number;
-    pthread_create(task_threads[task_number],NULL,thread_func,args);
+    pthread_create(task_threads+task_number,NULL,thread_func,args);
 
 }
 
@@ -167,7 +172,7 @@ void handle_prompt(daemon_file_t*  file){
     if(file->task_type== REMOVE_TASK){
 
     }
-    return -1;
+    
 }
 
 
@@ -316,21 +321,24 @@ int main(){
             int task_priority = pq_task->priority;
 
             if (task_running->task_id == -1 ||
-                task_infos[task_running->task_id].task->is_done == 1) 
+                task_infos[task_running->task_id].task->is_done == 1 ||
+                task_infos[task_running->task_id].task->running == 0)  
             {
                 task_running = pq_task;
                 task_infos[task_id].task->suspended = 0;
-            }
 
-            if (task_priority > task_running->priority && task_infos[task_id].task->suspended == 0) 
+                pop_pq(pq);
+            }
+            else if (task_priority > task_running->priority) 
             {
                 task_infos[task_running->task_id].task->suspended = 1;
                 task_infos[task_id].task->suspended = 0;
-                swap_task(task_running, pq_task);
-            }
 
-            pop_pq(pq);
-            pq_task = top_pq(pq);
+                insert_pq(pq, task_running);
+
+                pop_pq(pq);
+                task_running = pq_task;
+            }
         }
 
 		sleep(1);
@@ -338,3 +346,172 @@ int main(){
 
 	return 1;
 }
+
+struct returnValues * folderAnalysis(task_info_and_path* arguments) {
+    task_info_and_path* get_union_taskInfo_path = arguments;
+    struct task_info * taskInfo = get_union_taskInfo_path->task; 
+    const char* path = get_union_taskInfo_path->path;
+    static int indexOutput=0;
+    static bool limitReached = false;
+    static float totalPercentage = 0;
+    struct returnValues *ret = malloc(sizeof(returnValues));
+
+    while (taskInfo->suspended == true) {
+        sleep(0.2);
+    }
+
+
+    ret->response_code = 0;
+    ret->numberOfFolders = 0;
+    ret->size = 0;
+    ret->numberOfFiles = 0;
+
+    if (limitReached == true) {
+        ret->response_code = 1;
+        return ret;
+    }
+
+    if (indexOutput >= MAX_NUMBER_OF_FOLDERS-2) {
+        taskInfo->returnOutput[indexOutput].data.size = 0;
+        taskInfo->returnOutput[indexOutput].data.response_code = 1;
+        taskInfo->returnOutput[indexOutput].data.numberOfFolders = 0;
+        taskInfo->returnOutput[indexOutput].data.numberOfFiles = 0;
+
+        char temp[strlen(path) + strlen(taskInfo->returnOutput[0].path) + 1];
+        strcpy(temp, taskInfo->returnOutput[0].path);
+        strcat(temp, "...");
+        strcpy(taskInfo->returnOutput[indexOutput].path,temp);
+
+        limitReached = true;
+        return ret;
+    }
+
+    
+
+    DIR *bfs_traversal = opendir(path);
+
+    if (bfs_traversal == NULL) {
+        perror("Failed to open directory\n");
+        ret->response_code = -1;
+        return ret;
+    }
+
+    int numberFolders = 0;
+    struct dirent* bfs;
+    struct stat st;
+    while ((bfs = readdir(bfs_traversal)) != NULL) {
+        if (bfs) {
+            if (strcmp(bfs->d_name, ".") == 0 || strcmp(bfs->d_name, "..") == 0 || bfs->d_name[0] == '.')
+                continue;
+
+            char temp[strlen(path) + strlen(bfs->d_name) + 1];
+            strcpy(temp, path);
+            strcat(temp, "/");
+            strcat(temp, bfs->d_name);
+            if (stat(temp, &st) == 0 && S_ISDIR(st.st_mode)) {
+                numberFolders++;
+            }
+        }
+    }
+
+    DIR *dir = opendir(path);
+
+    if (dir == NULL) {
+        perror("Failed to open directory\n");
+        ret->response_code = -1;
+        return ret;
+    }
+
+    int saveIndex = indexOutput;
+    strcpy(taskInfo->returnOutput[saveIndex].path, path);
+
+    struct dirent* dp;
+    struct stat sb;
+
+    while ((dp = readdir(dir)) != NULL) {
+        errno = 0;
+
+        if (dp) {
+            if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0 || dp->d_name[0] == '.')
+                continue;
+
+            char temp[strlen(path) + strlen(dp->d_name) + 1];
+            strcpy(temp, path);
+            strcat(temp, "/");
+            strcat(temp, dp->d_name);
+
+            if (stat(temp, &sb) == 0) {
+                if (S_ISDIR(sb.st_mode)) {
+                    ret->numberOfFolders++;
+                    taskInfo->running_info.numberOfFolders ++;
+                    indexOutput++;
+                    
+                    task_info_and_path* union_taskInfo_path=malloc(sizeof(task_info_and_path));
+                    union_taskInfo_path->task=get_union_taskInfo_path->task;
+                    if (indexOutput < MAX_NUMBER_OF_FOLDERS-2)
+                        union_taskInfo_path->task->returnOutput[indexOutput].percentage = taskInfo->returnOutput[saveIndex].percentage / numberFolders;
+                    
+                    strcpy(union_taskInfo_path->path, temp);
+
+                    struct returnValues *ret_subdir = folderAnalysis(union_taskInfo_path);
+
+                    free(union_taskInfo_path);
+
+                    if (ret_subdir->response_code == -1) {
+                        ret->response_code = -1;
+                        closedir(dir);
+                        free(ret_subdir);
+                        taskInfo->returnOutput[saveIndex].data = *ret;
+                        return ret;
+                    }
+
+                    if (ret_subdir->response_code == 1) {
+                        ret->numberOfFolders--;
+                    }
+
+                    ret->size += ret_subdir->size;
+                    ret->numberOfFiles += ret_subdir->numberOfFiles;
+
+                    free(ret_subdir);
+
+                } else {
+                    taskInfo->running_info.size += sb.st_size;
+                    taskInfo->running_info.numberOfFiles++;
+
+                    ret->size += sb.st_size;
+                    ret->numberOfFiles++;
+                }
+            } else {
+                perror("Failed to get file stats\n");
+                ret->response_code = -1;
+                closedir(dir);
+                taskInfo->returnOutput[saveIndex].data = *ret;
+                return ret;
+            }
+        } else {
+            if (errno == 0) {
+                closedir(dir);
+                taskInfo->returnOutput[saveIndex].data = *ret;
+                return ret;
+            }
+
+            closedir(dir);
+            ret->response_code = -1;
+            taskInfo->returnOutput[saveIndex].data = *ret;
+            return ret;
+        }
+    }
+
+    taskInfo->returnOutput[saveIndex].data = *ret;
+    if (taskInfo->returnOutput[saveIndex].data.numberOfFolders == 0)
+        taskInfo->running_info.percentage += taskInfo->returnOutput[saveIndex].percentage;
+    //printf("%.2f%%\n",taskInfo->running_info.percentage);
+
+    closedir(dir);
+    return ret;
+}
+
+float calculatePercent(long size, long fullSize) {
+    return (size * 100) / fullSize;
+}
+

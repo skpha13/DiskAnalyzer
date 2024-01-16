@@ -4,5 +4,6 @@
         "string.h": "c",
         "errno.h": "c",
         "semaphore.h": "c"
-    }
+    },
+    "cmake.configureOnOpen": false
 }
