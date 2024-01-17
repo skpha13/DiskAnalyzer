@@ -4,7 +4,7 @@
 [Service]
 #the script to execute
 # Change path with the path accordingly with the path of the project
-ExecStart = /home/matoka26/Desktop/DiskAnalyzer/run_DiskAnalyzer.sh
+ExecStart = /usr/bin/diskanalyzerdaemon
 
 Restart = always
 
