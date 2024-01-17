@@ -54,3 +54,7 @@ dkms.conf
 FileSystem
 /cmake-build-debug
 /.idea
+
+da
+proc
+DaemonProcess
