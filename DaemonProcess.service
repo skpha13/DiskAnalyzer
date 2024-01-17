@@ -3,7 +3,8 @@
 
 [Service]
 #the script to execute
-ExecStart = /bin/DaemonProcessDiskAnalyser
+# Change path with the path accordingly with the path of the project
+ExecStart = /home/matoka26/Desktop/DiskAnalyzer/run_DiskAnalyzer.sh
 
 Restart = always
 
@@ -12,7 +13,6 @@ Restart = always
 # This section is for the service to start on StartUp
 [Install]
   WantedBy = multi-user.target
-
 
 
 
