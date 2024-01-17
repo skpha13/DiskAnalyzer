@@ -21,6 +21,7 @@
 #define FORMAT_LOG_ERROR "[ERROR] %d \n"
 #define MAX_NUMBER_OF_TASKS 500
 #define MAX_NUMBER_OF_FOLDERS 800
+#define MAX_NUMBER_OF_RUNNING_TASKS 4
 
 typedef struct returnValues {
     // response_code = -1 if it failed, 0 if it succeeded, 1 if limit has reached
@@ -158,13 +159,7 @@ void add_task(daemon_file_t * file){
         file->error=TOO_MANY_TASKS;
         return;
     }
-    //task->task->running_info.percentage = 0;
-    // strcpy(task->path,arguments->path_to_analize);
-    // task->task->is_done=0;
-    // task->task->running=1;
-    // task->task->suspended=1;
-    // task->task->priority=arguments->priority;
-    // task->task->deleted=0;
+   
     int task_number=file->next_task_id;
     file->next_task_id++;
     //create the thread and init the contents of its context block
@@ -435,8 +430,11 @@ int open_and_initialize_shm(daemon_file_t** p_daemon_file){
 }
 
 int main(){
-	task_struct* task_running = malloc(sizeof(task_struct));	
-    task_running->task_id = -1;
+	task_struct ** task_running = malloc(sizeof(task_struct) * MAX_NUMBER_OF_RUNNING_TASKS);	
+    for (int i=0; i<MAX_NUMBER_OF_RUNNING_TASKS; i++) {
+        task_running[i] = malloc(sizeof(task_struct));
+        task_running[i]->task_id = -1;
+    }
 
     // Initiate pq
     if(initiate_pq(&pq) < 0){
@@ -454,6 +452,7 @@ int main(){
 
     }
 	
+    int runningTaskIndex = 0;
 	while (1){
 		/*IPC with da.c shell*/
 	
@@ -474,34 +473,41 @@ int main(){
 		}
 		pthread_mutex_unlock(&communication_file->acces_file);
 
+        if (runningTaskIndex == MAX_NUMBER_OF_RUNNING_TASKS) {
+            runningTaskIndex = 0;
+        }
+
         task_struct* pq_task = top_pq(pq);
         
-        if (task_running->task_id!=-1&&task_infos[task_running->task_id].task->running == 0){
-            task_running->task_id = -1;
+        if (task_running[runningTaskIndex]->task_id!=-1&&task_infos[task_running[runningTaskIndex]->task_id].task->running == 0){
+            task_running[runningTaskIndex]->task_id = -1;
         }
          
         if (pq_task != NULL) {
             int task_id = pq_task->task_id;
             int task_priority = pq_task->priority;
 
-            if (task_running->task_id == -1 ||
-                task_infos[task_running->task_id].task->is_done == 1 ||
-                task_infos[task_running->task_id].task->running == 0)  
+            if (task_running[runningTaskIndex]->task_id == -1 ||
+                task_infos[task_running[runningTaskIndex]->task_id].task->is_done == 1 ||
+                task_infos[task_running[runningTaskIndex]->task_id].task->running == 0)  
             {
-                task_running = pq_task;
+                task_running[runningTaskIndex] = pq_task;
                 task_infos[task_id].task->suspended = 0;
 
+                runningTaskIndex++;
                 pop_pq(pq);
             }
-            else if (task_priority > task_running->priority) 
+            else if (task_priority > task_running[runningTaskIndex]->priority) 
             {
-                task_infos[task_running->task_id].task->suspended = 1;
+                task_infos[task_running[runningTaskIndex]->task_id].task->suspended = 1;
                 task_infos[task_id].task->suspended = 0;
 
-                insert_pq(pq, task_running);
+                insert_pq(pq, task_running[runningTaskIndex]);
+
+                task_running[runningTaskIndex] = pq_task;
+                runningTaskIndex++;
 
                 pop_pq(pq);
-                task_running = pq_task;
             }
         }
 
